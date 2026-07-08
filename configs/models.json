@@ -1,0 +1,208 @@
+{
+  "schema_version": "1.0",
+  "notes": [
+    "The proposed method is not expected to dominate every baseline.",
+    "All models must use chronological, leakage-free evaluation.",
+    "Hyperparameter selection must use training/validation data only."
+  ],
+  "models": [
+    {
+      "name": "naive_1",
+      "family": "statistical_baseline",
+      "enabled": true,
+      "description": "One-step persistence forecast y_hat[t] = y[t-1].",
+      "hyperparameters": {}
+    },
+    {
+      "name": "seasonal_naive",
+      "family": "statistical_baseline",
+      "enabled": true,
+      "description": "Seasonal persistence forecast. Use only when season_length is defined.",
+      "hyperparameters": {
+        "season_length": "dataset_specific"
+      }
+    },
+    {
+      "name": "drift",
+      "family": "statistical_baseline",
+      "enabled": true,
+      "description": "Linear drift forecast based on first and last training observations.",
+      "hyperparameters": {}
+    },
+    {
+      "name": "arima",
+      "family": "statistical_baseline",
+      "enabled": true,
+      "description": "ARIMA or auto-ARIMA-style model if implemented. Selection must be training-only.",
+      "hyperparameters": {
+        "order_search": {
+          "p": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "d": [
+            0,
+            1
+          ],
+          "q": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "criterion": "aic_or_validation"
+        }
+      }
+    },
+    {
+      "name": "ets",
+      "family": "statistical_baseline",
+      "enabled": true,
+      "description": "Exponential smoothing baseline.",
+      "hyperparameters": {
+        "trend": [
+          "none",
+          "add"
+        ],
+        "seasonal": [
+          "none",
+          "add"
+        ],
+        "season_length": "dataset_specific_or_none"
+      }
+    },
+    {
+      "name": "theta",
+      "family": "statistical_baseline",
+      "enabled": true,
+      "description": "Theta-method baseline where available.",
+      "hyperparameters": {
+        "seasonal_adjustment": "dataset_specific"
+      }
+    },
+    {
+      "name": "svr",
+      "family": "machine_learning_baseline",
+      "enabled": true,
+      "description": "Support Vector Regression with lagged inputs.",
+      "hyperparameters": {
+        "kernel": [
+          "rbf"
+        ],
+        "C": [
+          0.1,
+          1.0,
+          10.0,
+          100.0
+        ],
+        "epsilon": [
+          0.01,
+          0.05,
+          0.1
+        ],
+        "gamma": [
+          "scale"
+        ]
+      }
+    },
+    {
+      "name": "xgboost",
+      "family": "machine_learning_baseline",
+      "enabled": true,
+      "description": "Gradient-boosted tree baseline with lagged inputs.",
+      "hyperparameters": {
+        "n_estimators": [
+          50,
+          100,
+          200
+        ],
+        "max_depth": [
+          2,
+          3,
+          4
+        ],
+        "learning_rate": [
+          0.03,
+          0.05,
+          0.1
+        ],
+        "subsample": [
+          0.8,
+          1.0
+        ]
+      }
+    },
+    {
+      "name": "legacy_nfpso",
+      "family": "neuro_fuzzy",
+      "enabled": true,
+      "description": "Legacy-intent NFPSO-SC reproduction path for prior-work comparison and audit.",
+      "protocol": "legacy_intent",
+      "hyperparameters": {
+        "sc_radius": [
+          0.55
+        ],
+        "n_lags": "dataset_specific",
+        "particles": [
+          25
+        ],
+        "iterations": [
+          1000
+        ],
+        "objective": "legacy_error_std_or_configured"
+      }
+    },
+    {
+      "name": "projected_constricted_nfpso",
+      "family": "neuro_fuzzy",
+      "enabled": true,
+      "description": "Proposed constrained sparse TSK NFPSO trained by Projected Constricted PSO.",
+      "protocol": "research_baseline",
+      "hyperparameters": {
+        "sc_radius": [
+          0.35,
+          0.45,
+          0.55,
+          0.65,
+          0.75
+        ],
+        "particles": [
+          12
+        ],
+        "iterations": [
+          40
+        ],
+        "objective": "composite",
+        "sensitivity_weight": [
+          0.001
+        ],
+        "activation_penalty_weight": [
+          0.01
+        ],
+        "activation_floor": [
+          0.0001
+        ],
+        "validation_fraction": [
+          0.2
+        ]
+      }
+    }
+  ],
+  "diagnostics_required_for_neuro_fuzzy_models": [
+    "n_rules",
+    "n_parameters",
+    "min_activation_sum",
+    "median_activation_sum",
+    "jacobian_norm_mean",
+    "jacobian_norm_max",
+    "empirical_lipschitz_mean",
+    "empirical_lipschitz_max",
+    "parameter_l2_norm",
+    "boundary_hits",
+    "mean_velocity_norm",
+    "swarm_diameter",
+    "best_parameter_drift"
+  ]
+}
