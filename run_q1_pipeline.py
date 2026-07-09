@@ -70,6 +70,7 @@ DEFAULT_OUTPUT_ROOT = ROOT / "outputs" / "q1_minimal"
 ALL_STAGES = [
     "baselines",
     "synthetic_benchmarks",
+    "synthetic_nfpso_experiments",
     "nfpso_experiments",
     "real_data_benchmarks",
     "pso_budget",
@@ -254,6 +255,28 @@ def stage_command(
             cmd.extend(["--models", args.baseline_models])
         return cmd
 
+    if stage == "synthetic_nfpso_experiments":
+        cmd = python_command(
+            "run_synthetic_nfpso_experiments.py",
+            "--config",
+            config,
+            "--output-dir",
+            relpath(output_root),
+            "--merge-with-baselines",
+            *quick_flag,
+        )
+        if args.nfpso_protocols:
+            cmd.extend(["--protocols", args.nfpso_protocols])
+        if args.nfpso_radii:
+            cmd.extend(["--radii", args.nfpso_radii])
+        if args.nfpso_seeds:
+            cmd.extend(["--seeds", args.nfpso_seeds])
+        if args.nfpso_particles is not None:
+            cmd.extend(["--particles", str(args.nfpso_particles)])
+        if args.nfpso_iterations is not None:
+            cmd.extend(["--iterations", str(args.nfpso_iterations)])
+        return cmd
+
     if stage == "nfpso_experiments":
         cmd = python_command(
             "run_nfpso_experiments.py",
@@ -325,7 +348,7 @@ def stage_command(
         # Use the unified real-data benchmark and synthetic benchmark tables.
         default_inputs = [
             output_root / "real_data_benchmarks" / "metrics.csv",
-            output_root / "synthetic_benchmarks" / "metrics.csv",
+            output_root / "synthetic_unified_benchmarks" / "metrics.csv",
         ]
         inputs = args.statistics_inputs or ",".join(relpath(p) for p in default_inputs)
 
@@ -394,6 +417,7 @@ def validate_script_files(stages: Sequence[str]) -> List[str]:
     scripts_by_stage = {
         "baselines": "run_baselines.py",
         "synthetic_benchmarks": "run_synthetic_benchmarks.py",
+        "synthetic_nfpso_experiments": "run_synthetic_nfpso_experiments.py",
         "nfpso_experiments": "run_nfpso_experiments.py",
         "real_data_benchmarks": "run_real_data_benchmarks.py",
         "pso_budget": "run_pso_budget_sweep.py",
