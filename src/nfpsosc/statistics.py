@@ -42,6 +42,7 @@ Examples
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from math import comb, erf, sqrt
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
