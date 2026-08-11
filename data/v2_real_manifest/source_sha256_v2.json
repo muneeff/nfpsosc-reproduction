@@ -1,0 +1,81 @@
+{
+  "datasetsforecast_version": "1.0.1",
+  "source_root": "data/v2_real_manifest/sources",
+  "files": [
+    {
+      "path": "m3/datasets/m3_monthly_dataset.tsf",
+      "size_bytes": 960208,
+      "sha256": "962e5e217d3c98780ef240416daa4773a8e65961ea47e0a769178be58622d9c5"
+    },
+    {
+      "path": "m3/datasets/m3_monthly_dataset.zip",
+      "size_bytes": 336324,
+      "sha256": "80b0c1c92b6273f12d346256d3ee29489a7b081823430ad8b3a1cc01e06ccafd"
+    },
+    {
+      "path": "m3/datasets/m3_quarterly_dataset.tsf",
+      "size_bytes": 253744,
+      "sha256": "f2c52d0e4c8e948cd66dab139459609b71efbbf063f19927b8bd5d71d0512f16"
+    },
+    {
+      "path": "m3/datasets/m3_quarterly_dataset.zip",
+      "size_bytes": 96124,
+      "sha256": "c59f208d1ad3d38ff039e0bdc9e356fe7c83019ecd2dcae0a930b607c22b50c2"
+    },
+    {
+      "path": "m3/datasets/m3_yearly_dataset.tsf",
+      "size_bytes": 125743,
+      "sha256": "ca9f01bf47f46f18d656ff8fe9c4e018162ae219071b8df5f41ee3cf7d53e2bf"
+    },
+    {
+      "path": "m3/datasets/m3_yearly_dataset.zip",
+      "size_bytes": 50178,
+      "sha256": "08a23f5bcc4dc47acc67c8b6f08ad44c04ffcb9d714181a1744f73cdbf8d8510"
+    },
+    {
+      "path": "m4/datasets/M4-info.csv",
+      "size_bytes": 4335598,
+      "sha256": "26a75cc9b9f65e351b39b0bdbb7e3464ac837df0baf541ab55abdd2ba1a14c88"
+    },
+    {
+      "path": "m4/datasets/Monthly-test.csv",
+      "size_bytes": 7942698,
+      "sha256": "5e3538bf23b4a09f4078180c3e2b34859f0382e1c4f22564affc1797e8f3f48f"
+    },
+    {
+      "path": "m4/datasets/Monthly-train.csv",
+      "size_bytes": 91655432,
+      "sha256": "63aaa56198b4a22279a2fec541f56921f3bed6d8e0f84e550206df9276f2e9b9"
+    },
+    {
+      "path": "m4/datasets/Quarterly-test.csv",
+      "size_bytes": 1971754,
+      "sha256": "bf1cab3b969a744c220cdc148e3829803eaa5da2754270fc4f376e775cd7d0ae"
+    },
+    {
+      "path": "m4/datasets/Quarterly-train.csv",
+      "size_bytes": 38788547,
+      "sha256": "4450678cd493aa965c14bde984a5b62a66d8c3b2f7af1e53779bc91ff008ccdc"
+    },
+    {
+      "path": "m4/datasets/submission-Naive2.csv",
+      "size_bytes": 23409576,
+      "sha256": "f9610c625d6dee654ec458dcd07fb39373d065efc33b4f17d94c50b2aef00ef9"
+    },
+    {
+      "path": "m4/datasets/submission-Naive2.zip",
+      "size_bytes": 3564691,
+      "sha256": "120efea982b419e0f989505249ade55cdbd0727ea8597f75bdf7bef25b05867c"
+    },
+    {
+      "path": "m4/datasets/Yearly-test.csv",
+      "size_bytes": 1486434,
+      "sha256": "6dc2dd45b3af320389e2d3735cb4b3cdf320b63cbcda15d1a17193ab99702306"
+    },
+    {
+      "path": "m4/datasets/Yearly-train.csv",
+      "size_bytes": 25355736,
+      "sha256": "6aa668d4f04654c0bf5f07b266a51c556f0df2faf4709f852653755396a249e4"
+    }
+  ]
+}

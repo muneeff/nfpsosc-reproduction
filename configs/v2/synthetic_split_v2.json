@@ -1,0 +1,115 @@
+{
+  "protocol_version": "2.0",
+  "status": "LOCKED",
+  "legacy_v1": {
+    "dgp_seeds": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "allowed_use": "debugging and regression checks only",
+    "allowed_for_v2_hyperparameter_selection": false,
+    "allowed_for_v2_final_inference": false
+  },
+  "development": {
+    "dgp_seeds": [
+      1001,
+      1002,
+      1003,
+      1004,
+      1005,
+      1006,
+      1007,
+      1008,
+      1009,
+      1010
+    ],
+    "optimizer_seeds": [
+      31001,
+      31002,
+      31003
+    ],
+    "purpose": "method development and frozen hyperparameter selection only",
+    "number_of_dgp_seeds": 10,
+    "number_of_optimizer_replicates_per_condition": 3
+  },
+  "final_locked": {
+    "dgp_seeds": [
+      2001,
+      2002,
+      2003,
+      2004,
+      2005,
+      2006,
+      2007,
+      2008,
+      2009,
+      2010,
+      2011,
+      2012,
+      2013,
+      2014,
+      2015,
+      2016,
+      2017,
+      2018,
+      2019,
+      2020
+    ],
+    "optimizer_seeds": [
+      41001,
+      41002,
+      41003,
+      41004,
+      41005
+    ],
+    "purpose": "final confirmatory evaluation only",
+    "number_of_dgp_seeds": 20,
+    "number_of_optimizer_replicates_per_condition": 5,
+    "generation_or_evaluation_before_protocol_freeze": false
+  },
+  "pairing_rules": {
+    "same_optimizer_seeds_across_pcnfpso_and_stochastic_ablation_variants": true,
+    "optimizer_replicates_are_independent_statistical_units": false,
+    "aggregate_optimizer_replicates_before_condition_level_inference": true,
+    "recommended_optimizer_aggregation": "median",
+    "base_condition_identifier": [
+      "generator",
+      "dgp_seed",
+      "noise_level"
+    ],
+    "dependence_block_identifier": [
+      "generator",
+      "dgp_seed"
+    ],
+    "reason_for_dependence_block": "noise levels derived from the same generator/seed base trajectory are not treated as independent replicates"
+  },
+  "seed_isolation": {
+    "development_final_dgp_overlap": false,
+    "development_final_optimizer_overlap": false,
+    "legacy_seed_reuse": false
+  },
+  "final_access_rule": "Final outcomes may be generated and inspected only after the complete Gate-2 protocol is committed and tagged. Seed publication itself is not considered access to final outcomes.",
+  "benchmark_composition": {
+    "lengths": [
+      180
+    ],
+    "confirmatory_noise_levels": [
+      0.05,
+      0.1,
+      0.2
+    ],
+    "noise_free_diagnostic_level": 0.0,
+    "custom_generators": [
+      "linear_ar",
+      "nonlinear_sine",
+      "regime_switching",
+      "spiky_outbreak",
+      "noisy_seasonal",
+      "short_memory"
+    ],
+    "zero_noise_replicates_used_for_inference": false
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "protocol_version": "2.0",
+  "status": "LOCKED",
+  "primary_metric": {
+    "name": "MASE",
+    "direction": "lower_is_better",
+    "forecast_error_numerator": "mean absolute forecast error over the test window",
+    "scale_denominator": "mean absolute seasonal-naive difference computed exclusively from the pre-test training window",
+    "formula": "MASE = mean_test(abs(y-yhat)) / mean_train(abs(y[t]-y[t-m]))",
+    "seasonal_period": "frozen metadata m; use m=1 for nonseasonal series",
+    "minimum_scale": 1e-12,
+    "final_test_used_in_scale": false
+  },
+  "primary_comparison": {
+    "difference_definition": "D_i = MASE_PC-NFPSO_i - MASE_baseline_i",
+    "negative_difference": "PC-NFPSO better",
+    "positive_difference": "baseline better",
+    "zero_difference": "tie",
+    "primary_estimand": "population median of paired MASE differences",
+    "point_estimator": "sample median of paired MASE differences",
+    "confidence_interval": "two-sided 95 percent exact/nonparametric order-statistic confidence interval for the median based on the binomial distribution",
+    "primary_test": "two-sided paired sign test",
+    "null": "P(D<0)=P(D>0)=0.5 among non-tied pairs",
+    "ties": "exact zero differences excluded from sign-test trial count and reported separately",
+    "alpha": 0.05
+  },
+  "synthetic_analysis_unit": {
+    "optimizer_replicate_aggregation": "median MASE within process x DGP-seed x noise condition",
+    "confirmatory_noise_aggregation": "arithmetic mean across noise levels 0.05, 0.10, 0.20 after optimizer aggregation",
+    "final_block": "process x DGP-seed",
+    "number_of_processes": 9,
+    "number_of_final_dgp_seeds": 20,
+    "target_final_blocks": 180,
+    "noise_zero_in_inference": false,
+    "optimizer_replicates_are_analysis_units": false
+  },
+  "real_analysis_unit": {
+    "unit": "one final real series",
+    "target_units": 120,
+    "strata": 6,
+    "development_series_in_confirmatory_inference": false
+  },
+  "domains": {
+    "synthetic": "confirmatory domain reported separately",
+    "real": "confirmatory domain reported separately",
+    "combined_synthetic_real_score": false
+  },
+  "seasonal_naive_support": {
+    "comparison_only_where": "m > 1",
+    "undefined_nonseasonal_rows_not_created": true,
+    "pair_count_reported": true
+  },
+  "secondary_metrics": {
+    "MAE": {
+      "direction": "lower_is_better",
+      "pooled_cross_scale_headline": false
+    },
+    "RMSE": {
+      "direction": "lower_is_better",
+      "pooled_cross_scale_headline": false
+    },
+    "sMAPE": {
+      "direction": "lower_is_better",
+      "role": "secondary descriptive/sensitivity"
+    },
+    "RMSSE": {
+      "direction": "lower_is_better",
+      "role": "secondary scale-free"
+    }
+  },
+  "secondary_effect_summaries": [
+    "mean paired MASE difference",
+    "median paired MASE difference",
+    "win proportion",
+    "tie proportion",
+    "loss proportion"
+  ],
+  "wilcoxon": {
+    "role": "sensitivity analysis only",
+    "used_for_primary_claim": false
+  },
+  "failure_reporting": {
+    "model_failure_rate_reported_separately": true,
+    "silent_fallback": false,
+    "accuracy_inference_requires_observed_predictions": true,
+    "common_success_pair_count_always_reported": true,
+    "claim_language_if_failures_occur": "accuracy inference is explicitly conditional on successful forecasts; operational failure rates must be interpreted jointly and cannot be hidden by pair deletion"
+  }
+}

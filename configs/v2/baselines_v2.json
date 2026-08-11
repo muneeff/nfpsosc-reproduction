@@ -1,0 +1,219 @@
+{
+  "protocol_version": "2.0",
+  "status": "LOCKED",
+  "common": {
+    "forecast_horizon": 1,
+    "test_update_policy": "fixed fitted model parameters; observed true history available up to each forecast origin; no parameter refit during the test window",
+    "no_test_outcome_for_tuning": true,
+    "no_silent_fallback": true,
+    "failed_forecast_imputation": false,
+    "all_failures_logged": true,
+    "supervised_lag_rule": "inherit frozen L=min(12,max(5,m))",
+    "supervised_validation_rule": "chronological tail of the pre-test training segment only",
+    "supervised_validation_fraction": 0.2,
+    "supervised_validation_min_origins": 5,
+    "supervised_inner_fit_minimum_after_lagging": 10,
+    "candidate_selection_metric": "validation MASE",
+    "final_refit": "after candidate selection, refit the selected configuration on the complete pre-test training window",
+    "tie_policy": "use deterministic model-specific complexity-oriented tie-breaks",
+    "inner_validation_size_formula": "V=min(max(5,ceil(0.20*N_train)), N_train-L-10); require V>=5",
+    "inner_validation_forecasting": "selected candidate is fit once on the inner-fit segment and predicts validation origins using observed lag history without parameter refitting",
+    "mase_denominator_for_tuning": "computed only from the inner-fit segment using frozen seasonal period m"
+  },
+  "baselines": {
+    "naive_1": {
+      "tuning": "none",
+      "forecast": "y_hat[t]=y[t-1]"
+    },
+    "seasonal_naive": {
+      "tuning": "none",
+      "availability": "m>1 only",
+      "forecast": "y_hat[t]=y[t-m]",
+      "seasonal_period_source": "frozen metadata"
+    },
+    "drift": {
+      "tuning": "none",
+      "fit_window": "complete pre-test training segment",
+      "forecast": "linear random-walk-with-drift extrapolation using first and last training observations; parameters fixed during test"
+    },
+    "sarima": {
+      "implementation": "statsmodels SARIMAX",
+      "selection": "minimum finite AICc on pre-test training only",
+      "p": [
+        0,
+        1,
+        2
+      ],
+      "d": [
+        0,
+        1
+      ],
+      "q": [
+        0,
+        1,
+        2
+      ],
+      "P": [
+        0,
+        1
+      ],
+      "D": [
+        0,
+        1
+      ],
+      "Q": [
+        0,
+        1
+      ],
+      "seasonal_terms": "P,D,Q forced to 0 when m=1",
+      "seasonal_period": "frozen m when m>1",
+      "order_constraint": "p+q+P+Q <= 4",
+      "trend_rule": "constant allowed only when d=0 and D=0; otherwise no deterministic constant",
+      "enforce_stationarity": false,
+      "enforce_invertibility": false,
+      "failed_candidate": "skip and log",
+      "all_candidates_failed": "baseline run failure; no fallback"
+    },
+    "ets": {
+      "implementation": "statsmodels Holt-Winters ExponentialSmoothing",
+      "selection": "minimum finite AICc on pre-test training only",
+      "trend": [
+        null,
+        "add"
+      ],
+      "damped_trend": [
+        false,
+        true
+      ],
+      "damped_constraint": "True allowed only when trend=add",
+      "seasonal_nonseasonal": [
+        null
+      ],
+      "seasonal_when_m_gt_1": [
+        null,
+        "add"
+      ],
+      "seasonal_periods": "frozen m when seasonal=add",
+      "multiplicative_components": false,
+      "initialization_method": "estimated",
+      "use_boxcox": false,
+      "failed_candidate": "skip and log",
+      "all_candidates_failed": "baseline run failure; no fallback"
+    },
+    "theta": {
+      "implementation": "statsmodels ThetaModel",
+      "hyperparameter_search": "none",
+      "theta": 2.0,
+      "nonseasonal": {
+        "period": null,
+        "deseasonalize": false
+      },
+      "seasonal": {
+        "period": "frozen m",
+        "deseasonalize": true,
+        "use_test": false,
+        "method": "additive"
+      },
+      "forecast_extraction": "position based: first returned forecast value, never pandas label [0]",
+      "failure": "run failure; no substitution with naive or any other model"
+    },
+    "ridge_lag": {
+      "implementation": "sklearn Ridge",
+      "X_scaling": "StandardScaler fit on inner-fit only during tuning and full pre-test training after selection",
+      "y_scaling": "StandardScaler fit on inner-fit only during tuning and full pre-test training after selection",
+      "alpha": [
+        1e-06,
+        0.0001,
+        0.01,
+        0.1,
+        1.0,
+        10.0,
+        100.0
+      ],
+      "selection": "chronological inner-validation MASE",
+      "tie_break": "larger alpha"
+    },
+    "svr_rbf": {
+      "implementation": "sklearn SVR",
+      "kernel": "rbf",
+      "X_scaling": "StandardScaler training-only",
+      "y_scaling": "StandardScaler training-only; predictions inverse transformed",
+      "C": [
+        0.1,
+        1.0,
+        10.0,
+        100.0
+      ],
+      "epsilon": [
+        0.01,
+        0.05,
+        0.1
+      ],
+      "gamma": [
+        "scale",
+        0.1,
+        1.0
+      ],
+      "candidate_count": 36,
+      "selection": "chronological inner-validation MASE",
+      "tie_break_order": [
+        "smaller C",
+        "larger epsilon",
+        "gamma=scale before numeric gamma"
+      ]
+    },
+    "xgboost": {
+      "implementation": "xgboost XGBRegressor",
+      "objective": "reg:squarederror",
+      "booster": "gbtree",
+      "tree_method": "hist",
+      "n_estimators": [
+        100,
+        300
+      ],
+      "max_depth": [
+        2,
+        3
+      ],
+      "learning_rate": [
+        0.03,
+        0.1
+      ],
+      "min_child_weight": [
+        1,
+        5
+      ],
+      "candidate_count": 16,
+      "subsample": 1.0,
+      "colsample_bytree": 1.0,
+      "reg_lambda": 1.0,
+      "reg_alpha": 0.0,
+      "n_jobs": 1,
+      "random_state": 271828,
+      "selection": "chronological inner-validation MASE",
+      "tie_break_order": [
+        "fewer trees",
+        "shallower depth",
+        "lower learning rate",
+        "larger min_child_weight"
+      ]
+    }
+  },
+  "qc_gate": {
+    "mandatory_before_final": true,
+    "theta_nonzero_index_unit_test": true,
+    "theta_forecast_must_not_use_label_indexing": true,
+    "forecast_length_exact": true,
+    "finite_prediction_required": true,
+    "no_model_name_with_substituted_forecast": true,
+    "failure_count_logged_per_model_and_condition": true,
+    "prediction_provenance_logged": true,
+    "development_smoke_test_required": true,
+    "final_execution_blocked_if_qc_fails": true
+  },
+  "software_lock_target": {
+    "statsmodels": "0.14.6",
+    "scikit-learn": "1.7.2",
+    "xgboost": "3.2.0"
+  }
+}

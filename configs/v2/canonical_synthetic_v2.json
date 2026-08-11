@@ -1,0 +1,76 @@
+{
+  "protocol_version": "2.0",
+  "status": "LOCKED",
+  "role": "canonical nonlinear/chaotic benchmark processes; not claimed to be a single established benchmark collection",
+  "common": {
+    "observed_dimension": "one univariate scalar series per process",
+    "series_length": 180,
+    "train_fraction": 0.8,
+    "forecast_horizon": 1,
+    "confirmatory_noise_levels": [
+      0.05,
+      0.1,
+      0.2
+    ],
+    "noise_free_level": 0.0,
+    "noise_free_role": "diagnostic only",
+    "contamination": "same frozen relative Gaussian observation-noise mechanism used for the custom DGP suite",
+    "dgp_seeds": "use the disjoint development/final DGP seed domains already frozen in synthetic_split_v2.json"
+  },
+  "processes": {
+    "logistic_map": {
+      "equation": "x[t+1] = r*x[t]*(1-x[t])",
+      "r": 4.0,
+      "observed_variable": "x",
+      "initial_condition": "x0 ~ Uniform(0.1,0.9) from the DGP seed",
+      "burn_in_iterations": 500,
+      "post_burn_sampling_stride": 1,
+      "seasonal_period": 1,
+      "reference": "May 1976, Nature, doi:10.1038/261459a0"
+    },
+    "henon_map": {
+      "equations": [
+        "x[t+1] = 1 - a*x[t]^2 + y[t]",
+        "y[t+1] = b*x[t]"
+      ],
+      "a": 1.4,
+      "b": 0.3,
+      "observed_variable": "x",
+      "initial_condition": "x0,y0 independently ~ Uniform(-0.5,0.5) from the DGP seed",
+      "burn_in_iterations": 1000,
+      "post_burn_sampling_stride": 1,
+      "seasonal_period": 1,
+      "reference": "Henon 1976, Communications in Mathematical Physics, doi:10.1007/BF01608556"
+    },
+    "lorenz63": {
+      "equations": [
+        "dx/dt = sigma*(y-x)",
+        "dy/dt = x*(rho-z)-y",
+        "dz/dt = x*y-beta*z"
+      ],
+      "sigma": 10.0,
+      "rho": 28.0,
+      "beta": 2.6666666666666665,
+      "observed_variable": "x",
+      "numerical_integrator": "fixed-step classical RK4",
+      "integration_dt": 0.01,
+      "record_every_integration_steps": 10,
+      "effective_sampling_interval": 0.1,
+      "initial_condition": "x0~Uniform(-15,15), y0~Uniform(-20,20), z0~Uniform(5,35), independently from the DGP seed",
+      "burn_in_integration_steps": 5000,
+      "seasonal_period": 1,
+      "reference": "Lorenz 1963, Journal of the Atmospheric Sciences, doi:10.1175/1520-0469(1963)020<0130:DNF>2.0.CO;2"
+    }
+  },
+  "reproducibility_rules": {
+    "rng": "numpy.random.default_rng(dgp_seed)",
+    "same_clean_trajectory_shared_across_noise_levels_within_process_and_seed": true,
+    "noise_levels_form_dependent_conditions": true,
+    "dependence_block": [
+      "process",
+      "dgp_seed"
+    ],
+    "final_outcomes_before_gate2_freeze": false
+  },
+  "scope_note": "These processes supplement, rather than replace, the six custom stress-test DGPs."
+}

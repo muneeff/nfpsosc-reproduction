@@ -1,0 +1,175 @@
+{
+  "protocol_version": "2.0",
+  "status": "LOCKED",
+  "purpose": "pre-specified internal component attribution for PC-NFPSO",
+  "common_rules": {
+    "lag_policy": "inherit frozen V2 lag rule",
+    "sc_radius": "use single globally selected development-only radius; no ablation-specific retuning",
+    "ridge_alpha": "use single globally selected development-only ridge alpha; no ablation-specific retuning",
+    "scaling": "training-only frozen V2 scaling policy",
+    "antecedent_bounds": "identical across all PSO variants",
+    "particles": 12,
+    "iterations": 40,
+    "initialization": "same subtractive-clustering particle-0 initialization and same random initialization rule",
+    "full_objective": "0.5*RMSE_fit + RMSE_validation + 0.001*S + 0.01*A",
+    "optimizer_budget_equal_for_stochastic_variants": true,
+    "final_results_used_to_redefine_variants": false
+  },
+  "optimizer_factorial": {
+    "nonconstricted_dynamics": {
+      "initial_inertia": 1.0,
+      "inertia_damping": 0.99,
+      "cognitive": 1.0,
+      "social": 2.0
+    },
+    "constricted_dynamics": {
+      "phi1": 2.05,
+      "phi2": 2.05,
+      "chi_approx": 0.7298437881283576,
+      "c1_approx": 1.496179765663133,
+      "c2_approx": 1.496179765663133
+    },
+    "boundary_projection": {
+      "name": "project",
+      "rule": "reflect velocity components associated with out-of-bounds coordinates, then coordinate-wise clip candidate to the frozen feasible box"
+    },
+    "boundary_no_projection": {
+      "name": "feasible_rejection",
+      "rule": "if any coordinate of a proposed particle move is outside the frozen feasible box, reject that proposed move, retain the previous particle position, and reverse the offending velocity components; do not evaluate an infeasible model"
+    }
+  },
+  "variants": {
+    "NF_BASE": {
+      "pso": false,
+      "antecedents": "subtractive-clustering initialization using frozen global radius",
+      "consequents": "ridge using frozen global alpha",
+      "final_refit": "consequents refit on complete pre-test training segment",
+      "role": "isolates total value of antecedent PSO optimization"
+    },
+    "NFPSO": {
+      "pso": true,
+      "dynamics": "nonconstricted",
+      "boundary": "feasible_rejection",
+      "objective": "full_composite"
+    },
+    "P_NFPSO": {
+      "pso": true,
+      "dynamics": "nonconstricted",
+      "boundary": "project",
+      "objective": "full_composite"
+    },
+    "C_NFPSO": {
+      "pso": true,
+      "dynamics": "constricted",
+      "boundary": "feasible_rejection",
+      "objective": "full_composite"
+    },
+    "PC_NFPSO": {
+      "pso": true,
+      "dynamics": "constricted",
+      "boundary": "project",
+      "objective": "full_composite",
+      "role": "reference full model"
+    },
+    "PC_NO_SENSITIVITY": {
+      "pso": true,
+      "dynamics": "constricted",
+      "boundary": "project",
+      "objective": "0.5*RMSE_fit + RMSE_validation + 0.01*A",
+      "sensitivity_weight": 0.0
+    },
+    "PC_NO_COVERAGE": {
+      "pso": true,
+      "dynamics": "constricted",
+      "boundary": "project",
+      "objective": "0.5*RMSE_fit + RMSE_validation + 0.001*S",
+      "coverage_penalty_weight": 0.0
+    },
+    "PC_VALIDATION_ONLY": {
+      "pso": true,
+      "dynamics": "constricted",
+      "boundary": "project",
+      "objective": "RMSE_validation only",
+      "fit_rmse_weight": 0.0,
+      "sensitivity_weight": 0.0,
+      "coverage_penalty_weight": 0.0
+    }
+  },
+  "synthetic_final_ablation": {
+    "processes": "all nine frozen synthetic process families",
+    "dgp_seeds": "2001-2010 inclusive",
+    "confirmatory_noise_levels": [
+      0.05,
+      0.1,
+      0.2
+    ],
+    "optimizer_seeds": [
+      41001,
+      41002,
+      41003
+    ],
+    "optimizer_aggregation": "median within process x DGP-seed x noise",
+    "noise_aggregation": "arithmetic mean across the three confirmatory noise levels",
+    "analysis_unit": "process x DGP seed",
+    "target_analysis_units": 90,
+    "variants": [
+      "NF_BASE",
+      "NFPSO",
+      "P_NFPSO",
+      "C_NFPSO",
+      "PC_NFPSO",
+      "PC_NO_SENSITIVITY",
+      "PC_NO_COVERAGE",
+      "PC_VALIDATION_ONLY"
+    ]
+  },
+  "real_final_ablation": {
+    "series": "all 120 frozen final real series",
+    "variants": [
+      "NF_BASE",
+      "PC_NFPSO"
+    ],
+    "purpose": "external-domain anchor for whether antecedent PSO optimization improves over the clustering-only neuro-fuzzy model",
+    "additional_real_factorial_variants": false
+  },
+  "planned_component_contrasts": {
+    "total_pso_effect": "PC_NFPSO vs NF_BASE",
+    "projection_under_nonconstricted_dynamics": "P_NFPSO vs NFPSO",
+    "projection_under_constricted_dynamics": "PC_NFPSO vs C_NFPSO",
+    "constriction_without_projection": "C_NFPSO vs NFPSO",
+    "constriction_with_projection": "PC_NFPSO vs P_NFPSO",
+    "projection_constriction_interaction": "compare the two projection effects and the two constriction effects descriptively",
+    "sensitivity_penalty": "PC_NFPSO vs PC_NO_SENSITIVITY",
+    "coverage_penalty": "PC_NFPSO vs PC_NO_COVERAGE",
+    "composite_vs_validation_only": "PC_NFPSO vs PC_VALIDATION_ONLY"
+  },
+  "inferential_family": {
+    "primary_internal_ablation_domain": "synthetic final ablation subset",
+    "reference_model": "PC_NFPSO",
+    "confirmatory_reference_contrasts": [
+      "NF_BASE",
+      "NFPSO",
+      "P_NFPSO",
+      "C_NFPSO",
+      "PC_NO_SENSITIVITY",
+      "PC_NO_COVERAGE",
+      "PC_VALIDATION_ONLY"
+    ],
+    "number_of_reference_contrasts": 7,
+    "metric": "MASE",
+    "paired_difference": "MASE_PC_NFPSO - MASE_variant",
+    "test": "exact two-sided paired sign test",
+    "effect": "median paired MASE difference",
+    "confidence_interval": "95 percent exact nonparametric order-statistic CI for median paired difference",
+    "multiplicity": "Holm correction across the seven pre-specified synthetic ablation reference contrasts",
+    "familywise_alpha": 0.05,
+    "separate_from_external_baseline_family": true
+  },
+  "interpretation_rules": {
+    "no_component_claim_from_point_estimate_alone": true,
+    "non_significant_not_equivalent": true,
+    "interaction_claim": "descriptive unless separately supported; do not claim interaction significance from unmatched pairwise p-values",
+    "feature_ablation": "not included because engineered features are not part of the frozen base PC-NFPSO definition",
+    "ridge_zero_ablation": "not included; ridge is treated as a frozen estimation component rather than a claimed novelty"
+  }
+}

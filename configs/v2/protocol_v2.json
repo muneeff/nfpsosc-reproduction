@@ -1,0 +1,360 @@
+{
+  "protocol_version": "2.0",
+  "status": "LOCKED",
+  "created": "2026-08-11",
+  "v1_parent_commit": "fdd9ed5bf5ba1be23660aee1e2a785eb1cdb2476",
+  "locked_decisions": {
+    "A1_objective_family": "composite",
+    "objective_components": [
+      "fit_rmse",
+      "validation_rmse",
+      "sensitivity_penalty",
+      "low_coverage_penalty"
+    ],
+    "B1_forecast_update_policy": "fixed_model_parameters_with_observed_history",
+    "state_space_exception": "latent state may be updated using newly observed values, but model parameters must not be re-estimated during the test window",
+    "C_hyperparameter_firewall": [
+      "development",
+      "freeze",
+      "final_locked_benchmark"
+    ],
+    "A1_objective_exact": {
+      "formula": "0.5*RMSE_fit + 1.0*RMSE_validation + 0.001*S + 0.01*A",
+      "evaluation_scale": "training-fitted scaled domain",
+      "fit_rmse_weight": 0.5,
+      "validation_rmse_weight": 1.0,
+      "sensitivity_weight": 0.001,
+      "coverage_penalty_weight": 0.01,
+      "activation_floor": 0.0001,
+      "activation_numerical_floor": 1e-300,
+      "sensitivity_definition": "mean squared L2 norm of input Jacobian over fitting plus chronological-validation samples",
+      "coverage_penalty_definition": "mean squared log-shortfall of total raw Gaussian firing strength below activation_floor on chronological-validation samples",
+      "weight_selection": "fixed inherited method constants; no V2 tuning"
+    },
+    "B2_ridge_policy": {
+      "status": "SEARCH_SPACE_AND_SELECTION_RULE_LOCKED",
+      "candidate_alpha": [
+        1e-06,
+        1e-05,
+        0.0001,
+        0.001,
+        0.01,
+        0.05,
+        0.1
+      ],
+      "scope": "single global alpha for the base PC-NFPSO configuration",
+      "selection_data": "development benchmark only",
+      "selection_metric": "median MASE across development forecasting conditions",
+      "lower_is_better": true,
+      "tie_break": "if numerically equal on the primary selection statistic, choose the larger alpha",
+      "final_benchmark_access": false,
+      "per_final_dataset_retuning": false,
+      "regularized_parameters": "all TSK consequent coefficients as implemented in the V2 ridge solve",
+      "final_refit": "after antecedent selection, consequents are refitted on the complete pre-test training window using the frozen alpha",
+      "historical_note": "1e-4 was used by the V1 implementation whereas 0.05 was stated in the rejected manuscript; neither receives selection preference in V2"
+    },
+    "C1_lag_policy": {
+      "status": "LOCKED",
+      "input_representation": "contiguous raw chronological lags",
+      "rule": "L = min(12, max(5, m)); use m=1 when no known seasonal period exists",
+      "minimum_lag": 5,
+      "maximum_lag": 12,
+      "season_period_source": "dataset metadata or synthetic-generator specification fixed independently of forecast outcomes",
+      "unknown_or_nonseasonal_lag": 5,
+      "outcome_based_selection": false,
+      "development_tuning_for_base_model": false,
+      "final_dataset_retuning": false,
+      "one_step_feature_availability": "x_t may contain only observations y_(t-L) through y_(t-1) available before forecast origin t",
+      "lag_based_baseline_policy": "SVR, XGBoost, and any other supervised lag-feature baseline use the same L assigned to that series",
+      "state_space_policy": "ARIMA, ETS, and Theta are not forced into the supervised lag matrix; any seasonal period they use must come from frozen metadata, not final-test outcomes"
+    },
+    "D1_pso_numerical_specification": {
+      "status": "LOCKED",
+      "mode": "constricted",
+      "optimized_parameters": "TSK Gaussian antecedent centers and positive widths only",
+      "particles": 12,
+      "iterations": 40,
+      "early_stopping": false,
+      "constriction_phi1": 2.05,
+      "constriction_phi2": 2.05,
+      "phi_total": 4.1,
+      "constriction_formula": "chi = 2 / (phi - 2 + sqrt(phi^2 - 4*phi))",
+      "chi_approx": 0.7298437881283576,
+      "inertia_w": "chi",
+      "cognitive_c1": "chi*phi1",
+      "social_c2": "chi*phi2",
+      "c1_approx": 1.496179765663133,
+      "c2_approx": 1.496179765663133,
+      "inertia_damping_in_constricted_mode": false,
+      "velocity_fraction_of_parameter_span": 0.1,
+      "velocity_initialization": "all zeros",
+      "particle_initialization": "particle 0 is the clipped subtractive-clustering antecedent vector; remaining particles are uniform random draws within bounds",
+      "rng": "numpy.random.default_rng with a pre-specified run seed",
+      "random_vectors": "independent r1 and r2 vectors per particle update and parameter dimension",
+      "update_semantics": "sequential particle updates; global best can change within an iteration",
+      "nonfinite_initial_cost": "fatal error",
+      "nonfinite_later_cost": "replace by maximum finite floating-point value",
+      "center_lower_bound": "feature_min - 0.05*feature_range",
+      "center_upper_bound": "feature_max + 0.05*feature_range",
+      "sigma_lower_bound": "0.05*feature_range",
+      "sigma_upper_bound": "1.00*feature_range",
+      "feature_range_floor": 0.001,
+      "bound_data": "X_fit only",
+      "boundary_handling": "if proposed coordinate is outside bounds, reverse that velocity component and clip/project the proposed coordinate to the bound",
+      "velocity_clipping": "[-0.10*(upper-lower), +0.10*(upper-lower)] coordinate-wise",
+      "termination": "exactly 40 iterations; no performance-based early stopping",
+      "hyperparameter_tuning_on_v2": false,
+      "seed_allocation": "to be frozen separately under the development/final seed protocol"
+    },
+    "E1_synthetic_seed_firewall": {
+      "status": "LOCKED",
+      "manifest": "configs/v2/synthetic_split_v2.json",
+      "legacy_v1_dgp_seeds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "development_dgp_seeds": "1001-1010 inclusive",
+      "final_dgp_seeds": "2001-2020 inclusive",
+      "development_optimizer_seeds": [
+        31001,
+        31002,
+        31003
+      ],
+      "final_optimizer_seeds": [
+        41001,
+        41002,
+        41003,
+        41004,
+        41005
+      ],
+      "legacy_v1_allowed_for_selection": false,
+      "legacy_v1_allowed_for_final_inference": false,
+      "optimizer_replicates_statistical_unit": false,
+      "condition_level_optimizer_aggregation": "median",
+      "final_outcomes_access": "prohibited until full Gate-2 protocol commit and tag"
+    },
+    "F1_custom_synthetic_dgps": {
+      "status": "LOCKED",
+      "manifest": "configs/v2/synthetic_dgps_v2.json",
+      "generators": [
+        "linear_ar",
+        "nonlinear_sine",
+        "regime_switching",
+        "spiky_outbreak",
+        "noisy_seasonal",
+        "short_memory"
+      ],
+      "lengths": [
+        180
+      ],
+      "confirmatory_noise_levels": [
+        0.05,
+        0.1,
+        0.2
+      ],
+      "noise_free_diagnostic_level": 0.0,
+      "train_fraction": 0.8,
+      "forecast_horizon": 1,
+      "zero_noise_in_confirmatory_inference": false,
+      "reason_zero_noise_not_replicated": "deterministic clean generators such as nonlinear_sine and noisy_seasonal would otherwise create duplicated zero-noise series across different seeds",
+      "canonical_suite_status": "still required before Gate 2"
+    },
+    "F2_canonical_synthetic_suite": {
+      "status": "LOCKED",
+      "manifest": "configs/v2/canonical_synthetic_v2.json",
+      "processes": [
+        "logistic_map",
+        "henon_map",
+        "lorenz63"
+      ],
+      "terminology": "canonical nonlinear/chaotic benchmark processes; not claimed to constitute one established benchmark collection",
+      "series_length": 180,
+      "confirmatory_noise_levels": [
+        0.05,
+        0.1,
+        0.2
+      ],
+      "noise_free_diagnostic_level": 0.0,
+      "forecast_horizon": 1,
+      "development_final_seed_firewall": "inherits configs/v2/synthetic_split_v2.json",
+      "final_generation_before_gate2": false
+    },
+    "G1_real_series_selection_policy": {
+      "status": "LOCKED",
+      "manifest": "configs/v2/real_series_policy_v2.json",
+      "collections": [
+        "M3",
+        "M4"
+      ],
+      "frequencies": [
+        "Yearly",
+        "Quarterly",
+        "Monthly"
+      ],
+      "length_range": [
+        40,
+        180
+      ],
+      "development_per_stratum": 10,
+      "final_per_stratum": 20,
+      "total_public_development_target": 60,
+      "total_public_final_target": 120,
+      "selection_method": "deterministic SHA-256 ranking after model-independent eligibility screening",
+      "legacy_v1_series_excluded": true,
+      "yemen_tax_role": "legacy external descriptive case only; excluded from confirmatory inference",
+      "final_performance_before_gate2": false
+    },
+    "G2_real_series_exact_manifest": {
+      "status": "LOCKED",
+      "manifest": "configs/v2/real_series_manifest_v2.json",
+      "manifest_sha256": "4e36b9bf6e46719c5e9274ae523e82dc31aee1b7355e2abb188eaf70f7665602",
+      "csv": "data/v2_real_manifest/real_series_manifest_v2.csv",
+      "csv_sha256": "7d893bfe897becdabb4cea1c98ad2bfea9cbc00d7e14df8f60ad56fe0ed582fe",
+      "loader": "datasetsforecast==1.0.1",
+      "development_series": 60,
+      "final_locked_series": 120,
+      "legacy_intersection": 0,
+      "development_final_overlap": 0,
+      "final_forecasting_before_gate2": false
+    },
+    "H0_sc_radius_policy": {
+      "status": "SEARCH_SPACE_AND_SELECTION_RULE_LOCKED",
+      "candidate_radius": [
+        0.25,
+        0.35,
+        0.55,
+        0.75,
+        1.0
+      ],
+      "selection_domain": "synthetic development conditions only",
+      "development_dgp_seeds": "1001-1010 inclusive",
+      "final_dgp_seeds_access": false,
+      "legacy_v1_seeds_allowed": false,
+      "selection_metric": "median MASE after aggregation of optimizer replicates within each development condition",
+      "optimizer_replicate_aggregation": "median",
+      "scope": "one global radius for the base PC-NFPSO model",
+      "per_generator_radius": false,
+      "per_dataset_radius": false,
+      "real_series_radius_retuning": false,
+      "final_radius_retuning": false,
+      "tie_break": "if numerically tied on the selection statistic, choose the larger radius",
+      "historical_note": "The candidate grid matches the V1 sensitivity grid, but V2 selection is performed exclusively on disjoint development conditions."
+    },
+    "H1_baseline_protocol": {
+      "status": "LOCKED",
+      "manifest": "configs/v2/baselines_v2.json",
+      "methods": [
+        "naive_1",
+        "seasonal_naive",
+        "drift",
+        "sarima",
+        "ets",
+        "theta",
+        "ridge_lag",
+        "svr_rbf",
+        "xgboost"
+      ],
+      "tuning_test_leakage": false,
+      "silent_fallback": false,
+      "theta_v1_failure_mode_prohibited": true,
+      "supervised_tuner": "chronological inner-validation within pre-test training only",
+      "statistical_model_selection": "frozen AICc rule within pre-test training",
+      "final_test_used_for_configuration_selection": false,
+      "qc_gate_before_final": true
+    },
+    "I1_primary_metric_estimand": {
+      "status": "LOCKED",
+      "manifest": "configs/v2/metrics_v2.json",
+      "primary_metric": "MASE",
+      "paired_difference": "MASE_PC-NFPSO - MASE_baseline",
+      "primary_estimand": "median paired MASE difference",
+      "primary_test": "two-sided paired sign test",
+      "primary_ci": "95% nonparametric order-statistic CI for median paired difference",
+      "synthetic_final_unit": "process x DGP seed after median optimizer aggregation and mean confirmatory-noise aggregation",
+      "synthetic_final_target_blocks": 180,
+      "real_final_unit": "series",
+      "real_final_target_units": 120,
+      "synthetic_real_domains_combined": false,
+      "raw_RMSE_pooled_across_heterogeneous_series": false,
+      "wilcoxon_primary": false
+    },
+    "J1_complete_statistical_analysis_plan": {
+      "status": "LOCKED",
+      "manifest": "configs/v2/statistics_v2.json",
+      "primary_test": "exact two-sided paired sign test",
+      "primary_effect": "median paired MASE difference",
+      "primary_ci": "exact 95% order-statistic median CI",
+      "multiplicity": "Holm step-down",
+      "primary_family_size": 18,
+      "family_definition": "9 comparator hypotheses x 2 confirmatory domains",
+      "synthetic_analysis_unit": "process x DGP seed after optimizer and noise aggregation",
+      "real_analysis_unit": "series",
+      "wilcoxon_role": "sensitivity only",
+      "mean_bootstrap_role": "secondary effect sensitivity only",
+      "no_equivalence_from_nonsignificance": true
+    },
+    "K1_ablation_matrix": {
+      "status": "LOCKED",
+      "manifest": "configs/v2/ablation_v2.json",
+      "structural_variants": [
+        "NF_BASE",
+        "NFPSO",
+        "P_NFPSO",
+        "C_NFPSO",
+        "PC_NFPSO"
+      ],
+      "objective_variants": [
+        "PC_NO_SENSITIVITY",
+        "PC_NO_COVERAGE",
+        "PC_VALIDATION_ONLY"
+      ],
+      "synthetic_ablation_dgp_seeds": "2001-2010 inclusive",
+      "synthetic_ablation_optimizer_seeds": [
+        41001,
+        41002,
+        41003
+      ],
+      "synthetic_ablation_target_blocks": 90,
+      "real_ablation": [
+        "NF_BASE",
+        "PC_NFPSO"
+      ],
+      "internal_primary_family_size": 7,
+      "internal_multiplicity": "Holm",
+      "feature_ablation_in_primary_matrix": false
+    }
+  },
+  "feature_policy": {
+    "base_model_input": "raw_chronological_lags",
+    "engineered_summary_features": "not part of the base PC-NFPSO unless explicitly evaluated as a separate variant or ablation"
+  },
+  "leakage_rules": {
+    "final_data_for_tuning": false,
+    "final_data_for_model_selection": false,
+    "final_data_for_radius_selection": false,
+    "final_data_for_lag_selection": false,
+    "final_data_for_ridge_selection": false,
+    "final_data_for_objective_weight_selection": false
+  },
+  "failure_policy": {
+    "silent_fallback": false,
+    "score_fallback_under_original_model_name": false,
+    "all_failures_must_be_logged": true,
+    "mandatory_models_must_pass_development_smoke_tests_before_final_freeze": true
+  },
+  "final_test_rules": {
+    "run_only_after_configuration_freeze": true,
+    "post_final_hyperparameter_changes": false,
+    "bug_discovered_after_opening_final": "document the bug, invalidate affected final evaluation, fix on development, and use a new untouched final set"
+  },
+  "pending_before_gate_2": [],
+  "gate_2_ready": true,
+  "gate_2_rule": "No V2 forecasting outcome was generated before this protocol freeze",
+  "cryptographic_freeze_date": "2026-08-12",
+  "cryptographic_freeze_timestamp_local": "2026-08-12T00:17:43+03:00",
+  "cryptographic_freeze_status": "READY_FOR_COMMIT",
+  "forecast_outcomes_generated_before_freeze": false
+}

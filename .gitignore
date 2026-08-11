@@ -21,3 +21,4 @@ data/*.csv
 Thumbs.db
 .vscode/
 .idea/
+data/v2_real_manifest/sources/

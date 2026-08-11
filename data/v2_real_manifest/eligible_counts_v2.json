@@ -1,0 +1,39 @@
+{
+  "counts": {
+    "M3_Yearly": {
+      "eligible_after_legacy_exclusion": 141,
+      "development_selected": 10,
+      "final_selected": 20
+    },
+    "M3_Quarterly": {
+      "eligible_after_legacy_exclusion": 665,
+      "development_selected": 10,
+      "final_selected": 20
+    },
+    "M3_Monthly": {
+      "eligible_after_legacy_exclusion": 1428,
+      "development_selected": 10,
+      "final_selected": 20
+    },
+    "M4_Yearly": {
+      "eligible_after_legacy_exclusion": 8464,
+      "development_selected": 10,
+      "final_selected": 20
+    },
+    "M4_Quarterly": {
+      "eligible_after_legacy_exclusion": 22189,
+      "development_selected": 10,
+      "final_selected": 20
+    },
+    "M4_Monthly": {
+      "eligible_after_legacy_exclusion": 18273,
+      "development_selected": 10,
+      "final_selected": 20
+    }
+  },
+  "partition_totals": {
+    "final_locked": 120,
+    "development": 60
+  },
+  "total": 180
+}

@@ -1,0 +1,102 @@
+{
+  "protocol_version": "2.0",
+  "status": "LOCKED",
+  "common": {
+    "length": 180,
+    "train_fraction": 0.8,
+    "forecast_horizon": 1,
+    "confirmatory_noise_levels": [
+      0.05,
+      0.1,
+      0.2
+    ],
+    "noise_free_level": 0.0,
+    "noise_free_role": "diagnostic descriptive analysis only; not counted as replicated confirmatory observations",
+    "relative_noise_formula": "y_obs[t] = y_clean[t] + epsilon[t], epsilon[t] ~ Normal(0, (noise_level*max(std_population(y_clean),minimum_scale))^2)",
+    "std_ddof": 0,
+    "rng": "numpy.random.default_rng",
+    "note": "For stochastic generators the relative-noise term is additional contamination on top of intrinsic process innovations."
+  },
+  "generators": {
+    "linear_ar": {
+      "type": "custom_controlled",
+      "equation": "y[0]~N(0,1); y[t]=0.70*y[t-1]+e[t], e[t]~N(0,1)",
+      "intercept": 0.0,
+      "phi": 0.7,
+      "innovation_sd": 1.0,
+      "relative_noise_seed_offset": 1000,
+      "relative_noise_minimum_scale": 1.0,
+      "seasonal_period": 1
+    },
+    "nonlinear_sine": {
+      "type": "custom_controlled",
+      "equation": "y_clean[t]=10*sin(2*pi*t/24)+3.5*sin(2*pi*t/24)^2+0.03*t",
+      "period": 24,
+      "amplitude": 10.0,
+      "nonlinear_strength": 0.35,
+      "trend_per_step": 0.03,
+      "clean_signal_random": false,
+      "relative_noise_seed_offset": 2000,
+      "relative_noise_minimum_scale": 1.0,
+      "seasonal_period_for_lag_policy": 24
+    },
+    "regime_switching": {
+      "type": "custom_stress_test",
+      "switch_fraction": 0.55,
+      "switch_index_rule": "round(length*0.55)",
+      "initial_value": "N(0,1)",
+      "regime_1": "y[t]=0.03*t+0.75*y[t-1]+e[t], e[t]~N(0,0.8^2)",
+      "regime_2": "y[t]=-0.01*t+0.25*y[t-1]+e[t], e[t]~N(0,1.8^2)",
+      "relative_noise_seed_offset": 3000,
+      "relative_noise_minimum_scale": 1.0,
+      "seasonal_period": 1
+    },
+    "spiky_outbreak": {
+      "type": "custom_stress_test",
+      "baseline_equation": "y[t]=20+0.05*t+e[t], e[t]~N(0,1)",
+      "number_of_spikes": 5,
+      "spike_positions": "uniform sample without replacement from integer positions 10 through length-11",
+      "spike_height": "Uniform(20,70)",
+      "spike_width": "Uniform(1.5,5.0)",
+      "spike_shape": "height*exp(-0.5*((t-position)/width)^2)",
+      "nonnegative_projection": "max(y,0) before and after relative contamination",
+      "relative_noise_seed_offset": 4000,
+      "relative_noise_minimum_scale": 5.0,
+      "seasonal_period": 1
+    },
+    "noisy_seasonal": {
+      "type": "custom_controlled",
+      "equation": "y_clean[t]=50+0.04*t+8*sin(2*pi*t/12)+2.8*cos(4*pi*t/12)",
+      "season_length": 12,
+      "amplitude": 8.0,
+      "harmonic_multiplier": 0.35,
+      "trend_per_step": 0.04,
+      "clean_signal_random": false,
+      "relative_noise_seed_offset": 5000,
+      "relative_noise_minimum_scale": 2.0,
+      "seasonal_period": 12
+    },
+    "short_memory": {
+      "type": "custom_diagnostic",
+      "equation": "initialize y[t]=e[t], e[t]~N(0,1); for t>=2 set y[t]=y[t]+0.30*y[t-1]-0.15*y[t-2]",
+      "ar1": 0.3,
+      "ar2": -0.15,
+      "relative_noise_seed_offset": 6000,
+      "relative_noise_minimum_scale": 1.0,
+      "seasonal_period": 1
+    }
+  },
+  "inferential_unit": {
+    "condition_identifier": [
+      "generator",
+      "dgp_seed",
+      "noise_level"
+    ],
+    "dependence_block_identifier": [
+      "generator",
+      "dgp_seed"
+    ],
+    "optimizer_replicates_are_independent_units": false
+  },
+  "canonical_benchmark_suite": "configs/v2/canonical_synthetic_v2.json"
+}

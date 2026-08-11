@@ -1,0 +1,97 @@
+{
+  "freeze": "V2_GATE2_PROTOCOL_FREEZE",
+  "protocol_created_date": "2026-08-11",
+  "cryptographic_freeze_date": "2026-08-12",
+  "cryptographic_freeze_timestamp_local": "2026-08-12T00:17:43+03:00",
+  "branch": "v2-rebuild",
+  "v1_parent_commit": "fdd9ed5bf5ba1be23660aee1e2a785eb1cdb2476",
+  "forecast_outcomes_generated_before_freeze": false,
+  "file_count": 17,
+  "files": [
+    {
+      "path": ".gitignore",
+      "size_bytes": 246,
+      "sha256": "bc298a3831e264b968b3fa89f99225da96d8f911a140d982a31383167e76c564"
+    },
+    {
+      "path": "configs/v2/protocol_v2.json",
+      "size_bytes": 15161,
+      "sha256": "ff87b9249be89d9d96316da4671dc01bf4024495ff19a386641032b4dfdd66d3"
+    },
+    {
+      "path": "configs/v2/synthetic_split_v2.json",
+      "size_bytes": 2799,
+      "sha256": "bb460f303c2d29f162cb982bb6a1f5e831324ea4c9c8f5bb2ed1c7f70fc0c9b8"
+    },
+    {
+      "path": "configs/v2/synthetic_dgps_v2.json",
+      "size_bytes": 3654,
+      "sha256": "42ece7d80e9f52c7ab7307531135fcae949e034ee30a893f32c7749b44dcb03a"
+    },
+    {
+      "path": "configs/v2/canonical_synthetic_v2.json",
+      "size_bytes": 2805,
+      "sha256": "a948441f0f4e0f5b30e0a992997f0a216359ec47619e0c944c8104c26146e361"
+    },
+    {
+      "path": "configs/v2/real_series_policy_v2.json",
+      "size_bytes": 3965,
+      "sha256": "89a55b976f052974d35ac4cad5666b28cdbeca522d1186c4318a4e1ddbaadecd"
+    },
+    {
+      "path": "configs/v2/real_series_manifest_v2.json",
+      "size_bytes": 114428,
+      "sha256": "4e36b9bf6e46719c5e9274ae523e82dc31aee1b7355e2abb188eaf70f7665602"
+    },
+    {
+      "path": "configs/v2/baselines_v2.json",
+      "size_bytes": 6761,
+      "sha256": "a43704e658ee065e79738b067ecc171d46e3ed334a8022a02ee8576ee90289d3"
+    },
+    {
+      "path": "configs/v2/metrics_v2.json",
+      "size_bytes": 3531,
+      "sha256": "8883d9a3b0e776614ebfbb715c9a087ba3926bfa5626ba933da7f1278ce52664"
+    },
+    {
+      "path": "configs/v2/statistics_v2.json",
+      "size_bytes": 6330,
+      "sha256": "7de9b329e7b9fc21a5247e7a09a11dce07bdbfd469fd7c2286bdc38493b85ef6"
+    },
+    {
+      "path": "configs/v2/ablation_v2.json",
+      "size_bytes": 6667,
+      "sha256": "0af1e45037d406842a2ecc407aeb1616492a25a4146508c6af6bfb322fe8ae3e"
+    },
+    {
+      "path": "configs/v2/environment_protocol_freeze_2026-08-12.txt",
+      "size_bytes": 3636,
+      "sha256": "48acd2517073fb07f461322642aff64f421dc6e99484f2bf3765b7051759f34d"
+    },
+    {
+      "path": "docs/v2/PROTOCOL_FREEZE_V2.md",
+      "size_bytes": 29494,
+      "sha256": "80289e60aee12ffa9af10e54fd8c90132c2ed02fe84c5234731c49f4da343cf2"
+    },
+    {
+      "path": "build_real_series_manifest_v2.py",
+      "size_bytes": 10470,
+      "sha256": "107466599538e93f1739880971d8c6841c4200a2cde5da6c0216b1bbf590ae21"
+    },
+    {
+      "path": "data/v2_real_manifest/real_series_manifest_v2.csv",
+      "size_bytes": 37077,
+      "sha256": "7d893bfe897becdabb4cea1c98ad2bfea9cbc00d7e14df8f60ad56fe0ed582fe"
+    },
+    {
+      "path": "data/v2_real_manifest/eligible_counts_v2.json",
+      "size_bytes": 962,
+      "sha256": "403edc4eb85fe71cc5843e6989ef50efe9f3dd3630fb1eb712bb8e1220c13de9"
+    },
+    {
+      "path": "data/v2_real_manifest/source_sha256_v2.json",
+      "size_bytes": 2797,
+      "sha256": "b4b40d104a15f89fdb8b23f321351cdfed597164f0f14a6c36e8b59d48385fc0"
+    }
+  ]
+}

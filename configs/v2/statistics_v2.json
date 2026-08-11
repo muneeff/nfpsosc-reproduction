@@ -1,0 +1,168 @@
+{
+  "protocol_version": "2.0",
+  "status": "LOCKED",
+  "alpha": 0.05,
+  "primary_family": {
+    "description": "all confirmatory PC-NFPSO versus baseline tests across synthetic and real domains",
+    "domains": [
+      "synthetic",
+      "real"
+    ],
+    "comparators": [
+      "naive_1",
+      "seasonal_naive",
+      "drift",
+      "sarima",
+      "ets",
+      "theta",
+      "ridge_lag",
+      "svr_rbf",
+      "xgboost"
+    ],
+    "maximum_hypotheses": 18,
+    "multiplicity": "Holm step-down FWER control",
+    "familywise_alpha": 0.05,
+    "separate_holm_by_domain": false,
+    "nonestimable_or_failed_test_pvalue": 1.0
+  },
+  "paired_difference": {
+    "definition": "D = MASE_PC-NFPSO - MASE_baseline",
+    "pc_better": "D < 0",
+    "tie": "D == 0",
+    "baseline_better": "D > 0"
+  },
+  "primary_sign_test": {
+    "test": "exact two-sided paired sign test",
+    "implementation_target": "scipy.stats.binomtest",
+    "wins": "count(D < 0)",
+    "losses": "count(D > 0)",
+    "ties": "count(D == 0)",
+    "trial_count": "wins + losses; exact-zero ties excluded",
+    "null_probability": 0.5,
+    "alternative": "two-sided",
+    "all_ties_rule": "if wins+losses==0 set raw p-value to 1.0"
+  },
+  "primary_estimand_ci": {
+    "estimand": "population median paired MASE difference",
+    "point_estimate": "sample median of all finite paired differences",
+    "confidence_level": 0.95,
+    "method": "exact nonparametric order-statistic interval by binomial inversion",
+    "construction": "sort n finite paired differences; choose largest integer k>=1 satisfying 2*BinomCDF(k-1;n,0.5)<=0.05; CI=[D_(k),D_(n-k+1)]",
+    "ties_in_ci": "retained",
+    "note": "CI and primary effect target the same median location estimand"
+  },
+  "primary_directional_claim": {
+    "pcnfpso_superior_requires": [
+      "Holm-adjusted p < 0.05",
+      "sample median paired difference < 0",
+      "wins > losses"
+    ],
+    "baseline_superior_requires": [
+      "Holm-adjusted p < 0.05",
+      "sample median paired difference > 0",
+      "losses > wins"
+    ],
+    "otherwise": "no statistically supported directional superiority claim",
+    "language": "statistical non-significance is not interpreted as equivalence"
+  },
+  "synthetic_dependence": {
+    "raw_condition": "process x DGP seed x noise level",
+    "optimizer_replicate_aggregation": "median before inference",
+    "noise_aggregation": "arithmetic mean across confirmatory noise levels 0.05,0.10,0.20",
+    "primary_analysis_unit": "process x DGP seed",
+    "target_units": 180,
+    "noise_zero_excluded": true,
+    "optimizer_replicates_as_sample_size": false,
+    "noise_variants_as_sample_size": false
+  },
+  "real_dependence": {
+    "primary_analysis_unit": "one final real series",
+    "target_units": 120,
+    "stratified_reporting": [
+      "M3_Yearly",
+      "M3_Quarterly",
+      "M3_Monthly",
+      "M4_Yearly",
+      "M4_Quarterly",
+      "M4_Monthly"
+    ],
+    "development_series_excluded": true
+  },
+  "support_rules": {
+    "seasonal_naive": "include only units with m>1",
+    "common_success_pairs": "pairwise accuracy test uses finite observed forecasts from both models and reports n explicitly",
+    "failed_or_nonestimable_comparator_in_primary_family": "retain hypothesis with p=1.0 rather than shrink the Holm family",
+    "failure_rates": "reported separately for every method and domain",
+    "silent_fallback": false
+  },
+  "holm_algorithm": {
+    "sort": "ascending raw p-values",
+    "adjustment": "for ordered p_(i), q_(i)=max over j<=i of min(1,(m-j+1)*p_(j)); map q back to original hypotheses",
+    "m": "fixed maximum family size 18",
+    "missing_test": "p=1.0"
+  },
+  "sensitivity_wilcoxon": {
+    "role": "secondary sensitivity only",
+    "implementation_target": "scipy.stats.wilcoxon",
+    "alternative": "two-sided",
+    "zero_method": "wilcox",
+    "primary_claim_allowed": false,
+    "multiplicity": "report raw and Holm-adjusted values using the same 18 comparison labels, separately identified as sensitivity results",
+    "interpretation_note": "signed-rank inference is not treated as interchangeable with the primary median/sign-test estimand"
+  },
+  "secondary_mean_effect": {
+    "estimand": "arithmetic mean paired MASE difference",
+    "role": "secondary effect sensitivity only",
+    "confidence_level": 0.95,
+    "bootstrap_resamples": 10000,
+    "bootstrap_seed": 90210,
+    "synthetic_resampling": "stratified bootstrap: resample DGP-seed analysis units with replacement within each process and preserve process sizes",
+    "real_resampling": "stratified bootstrap: resample final real series with replacement within each source-frequency stratum and preserve stratum sizes",
+    "primary_claim_allowed": false
+  },
+  "reporting_required": [
+    "n eligible pairs",
+    "wins",
+    "ties",
+    "losses",
+    "median paired difference",
+    "95% median CI",
+    "raw sign-test p",
+    "Holm-adjusted primary p",
+    "mean paired difference as secondary",
+    "failure counts and rates",
+    "domain and comparator support"
+  ],
+  "prohibitions": [
+    "no pooled synthetic-plus-real hypothesis test",
+    "no treating optimizer replicates as independent units",
+    "no treating noise variants as independent units",
+    "no replacing failed forecasts with another model",
+    "no changing multiplicity family after inspecting p-values",
+    "no equivalence claim from p>=0.05"
+  ],
+  "internal_ablation_family": {
+    "status": "LOCKED",
+    "domain": "synthetic final ablation subset only",
+    "reference": "PC_NFPSO",
+    "comparators": [
+      "NF_BASE",
+      "NFPSO",
+      "P_NFPSO",
+      "C_NFPSO",
+      "PC_NO_SENSITIVITY",
+      "PC_NO_COVERAGE",
+      "PC_VALIDATION_ONLY"
+    ],
+    "hypotheses": 7,
+    "metric": "MASE",
+    "paired_difference": "MASE_PC_NFPSO - MASE_ablation_variant",
+    "test": "exact two-sided paired sign test",
+    "effect": "median paired MASE difference",
+    "confidence_interval": "95% exact nonparametric order-statistic CI",
+    "multiplicity": "Holm step-down across these 7 hypotheses",
+    "familywise_alpha": 0.05,
+    "separate_from_external_18_hypothesis_family": true,
+    "target_analysis_units": 90
+  }
+}
