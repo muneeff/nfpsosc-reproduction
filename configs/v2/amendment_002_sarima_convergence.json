@@ -1,0 +1,14 @@
+{
+  "amendment_id": "V2-A002",
+  "status": "LOCKED_BEFORE_DEVELOPMENT",
+  "scope": "Define SARIMA candidate validity with respect to numerical convergence. No candidate grid, AICc criterion, tie-break, test-time update policy, or final-set rule is changed.",
+  "parent_amendment_commit": "6aa4d277ab3bb0f87e973b4baabd84d09f6b4fac",
+  "sarima_candidate_validity": [
+    "fit completes without exception",
+    "all fitted parameters are finite",
+    "AICc is finite",
+    "mle_retvals exists and converged is exactly True"
+  ],
+  "invalid_candidate_policy": "Treat as candidate failure; log reason; exclude from AICc competition; never substitute or fallback.",
+  "justification": "A finite AICc from a non-converged maximum-likelihood optimization is not accepted as a valid model-selection candidate. This rule is frozen before any V2 development or final benchmark."
+}
