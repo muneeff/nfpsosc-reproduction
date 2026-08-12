@@ -1,0 +1,30 @@
+{
+  "amendment_id": "V2-A006",
+  "status": "LOCKED_BEFORE_DEVELOPMENT",
+  "title": "Lorenz-63 RK4 floating-point evaluation order clarification",
+  "parent_protocol_commit": "d1c2d24ab3f8677be409a9b9a6ca139a32310ac8",
+  "parent_code_commit": "2de9bcdb972ddfabe9fed0c67cbb5655bc53bb62",
+  "reason": "Lorenz-63 is chaotic. Algebraically equivalent floating-point arrangements of the RK4 state update can diverge materially after the frozen 5000-step burn-in. The exact source-level evaluation order must therefore be frozen before any V2 development outcome is generated.",
+  "numerical_type": "numpy float64 arrays and scalar float64-compatible arithmetic",
+  "rhs_evaluation_order": [
+    "dx = sigma*(y-x)",
+    "dy = x*(rho-z)-y",
+    "dz = x*y-beta*z"
+  ],
+  "rk4_step": {
+    "k1": "f(state)",
+    "k2": "f(state + 0.5*dt*k1)",
+    "k3": "f(state + 0.5*dt*k2)",
+    "k4": "f(state + dt*k3)",
+    "state_next": "state + (dt/6.0)*(k1 + 2.0*k2 + 2.0*k3 + k4)",
+    "dt": 0.01,
+    "implementation_rule": "Use the expression above in this parenthesization/order. Do not rewrite the final update as dt*(...)/6.0 or use an adaptive/vectorized ODE solver."
+  },
+  "sampling": {
+    "burn_in_steps": 5000,
+    "first_returned_sample": "x immediately after the 5000th exact RK4 step",
+    "steps_between_subsequent_samples": 10
+  },
+  "reproducibility_scope": "Source-level operation order is frozen for the pinned V2 Python/NumPy environment. No claim of bit-for-bit identity across arbitrary hardware, compilers, or future NumPy versions.",
+  "scientific_effect": "Implementation clarification only. No development or final performance outcome was generated or inspected to choose this rule."
+}
