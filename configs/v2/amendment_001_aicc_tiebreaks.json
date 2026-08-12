@@ -1,0 +1,28 @@
+{
+  "amendment_id": "V2-A001",
+  "status": "LOCKED_BEFORE_DEVELOPMENT",
+  "scope": "Resolve underspecified deterministic complexity-oriented AICc tie-breaks for SARIMA and ETS only. No candidate grid, metric, failure rule, test policy, or final-set rule is changed.",
+  "parent_protocol_commit": "d1c2d24ab3f8677be409a9b9a6ca139a32310ac8",
+  "sarima": {
+    "primary": "minimum finite AICc",
+    "exact_tie_break_order": [
+      "smaller p+q+P+Q",
+      "smaller P+Q",
+      "smaller p+q",
+      "smaller d+D",
+      "smaller D",
+      "lexicographic (p,d,q,P,D,Q,trend_code), trend_code n=0 c=1"
+    ]
+  },
+  "ets": {
+    "primary": "minimum finite AICc",
+    "exact_tie_break_order": [
+      "fewer active structural components",
+      "undamped before damped",
+      "nonseasonal before seasonal",
+      "no trend before additive trend",
+      "lexicographic (component_count,damped,seasonal_code,trend_code)"
+    ]
+  },
+  "justification": "This amendment operationalizes the already-frozen common tie_policy without using development or final outcomes."
+}
