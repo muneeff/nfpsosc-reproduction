@@ -1,0 +1,58 @@
+{
+  "amendment_id": "V2-A005",
+  "status": "LOCKED_BEFORE_DEVELOPMENT",
+  "title": "Canonical synthetic process sampling and contamination clarifications",
+  "parent_protocol_commit": "d1c2d24ab3f8677be409a9b9a6ca139a32310ac8",
+  "parent_code_commit": "e91d76b3a6ff1d9868dffcb0bb08e13bb1cd3420",
+  "scope": "Resolve canonical-process indexing and observation-noise RNG details before any V2 development hyperparameter selection.",
+  "canonical_processes": {
+    "logistic_map": {
+      "trajectory_rng": "numpy.random.default_rng(dgp_seed)",
+      "initial_condition_draw": "one Uniform(0.1,0.9) draw for x0",
+      "burn_in": "apply exactly 500 map updates without recording",
+      "first_returned_sample": "state after the 500th burn-in update",
+      "subsequent_samples": "apply one map update between consecutive returned samples",
+      "relative_noise_seed_offset": 7000,
+      "relative_noise_minimum_scale": 1.0
+    },
+    "henon_map": {
+      "trajectory_rng": "numpy.random.default_rng(dgp_seed)",
+      "initial_condition_draw": "x0 then y0 as two consecutive independent Uniform(-0.5,0.5) draws",
+      "burn_in": "apply exactly 1000 Henon updates without recording",
+      "first_returned_sample": "x component after the 1000th burn-in update",
+      "subsequent_samples": "apply one Henon update between consecutive returned samples",
+      "relative_noise_seed_offset": 8000,
+      "relative_noise_minimum_scale": 1.0
+    },
+    "lorenz63": {
+      "trajectory_rng": "numpy.random.default_rng(dgp_seed)",
+      "initial_condition_draw_order": [
+        "x0 ~ Uniform(-15,15)",
+        "y0 ~ Uniform(-20,20)",
+        "z0 ~ Uniform(5,35)"
+      ],
+      "integrator": "fixed-step classical RK4 with dt=0.01",
+      "burn_in": "apply exactly 5000 RK4 integration steps without recording",
+      "first_returned_sample": "x component immediately after the 5000th burn-in step",
+      "subsequent_samples": "apply exactly 10 RK4 steps between consecutive returned samples",
+      "relative_noise_seed_offset": 9000,
+      "relative_noise_minimum_scale": 1.0
+    }
+  },
+  "relative_observation_noise": {
+    "formula": "epsilon[t] ~ Normal(0, (noise_level*max(std_population(y_clean), minimum_scale))^2)",
+    "std_ddof": 0,
+    "rng_per_process_seed": "new numpy.random.default_rng(dgp_seed + process-specific offset)",
+    "same_standard_normal_vector_across_noise_levels": true,
+    "implementation_rule": "for a fixed process and dgp_seed, each positive noise level reinitializes the contamination RNG with the same offset seed, so the same standardized Gaussian draw is scaled by the requested noise level",
+    "noise_free_level": "0.0 returns an exact copy of the clean trajectory",
+    "negative_noise_levels": "invalid and must raise; they are never interpreted as noise-free",
+    "clean_trajectory_reuse": "one clean trajectory per process and dgp_seed is shared across all noise levels"
+  },
+  "custom_suite_conformance": {
+    "status": "V1 equations and frozen V2 custom specifications are semantically aligned for all six custom generators",
+    "v2_rule": "implement an isolated V2 synthetic module rather than importing the V1 synthetic module",
+    "reason": "freeze exact V2 names, validation, finite checks, std(ddof=0), and noise-level semantics while preserving the locked equations and seed offsets 1000 through 6000"
+  },
+  "scientific_effect": "Implementation clarification only; no development or final performance outcomes were generated or inspected to choose these rules."
+}
