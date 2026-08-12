@@ -754,3 +754,553 @@ class FrozenETS:
             self.history,
             observed,
         )
+from itertools import product
+
+
+def _lagged_xy_raw(
+    series: np.ndarray,
+    n_lags: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    y = np.asarray(series, dtype=float).reshape(-1)
+    L = int(n_lags)
+
+    if L < 1 or y.size <= L:
+        raise ValueError("invalid lag configuration")
+
+    X = np.asarray(
+        [y[t - L:t] for t in range(L, y.size)],
+        dtype=float,
+    )
+    target = y[L:].copy()
+
+    return X, target
+
+
+def inner_validation_size(
+    n_train: int,
+    n_lags: int,
+) -> int:
+    n = int(n_train)
+    L = int(n_lags)
+
+    V = min(
+        max(5, int(np.ceil(0.20 * n))),
+        n - L - 10,
+    )
+
+    if V < 5:
+        raise ValueError(
+            "insufficient training data for frozen "
+            "inner-validation rule"
+        )
+
+    return int(V)
+
+
+def _mase_scale(
+    training_series,
+    seasonal_period: int,
+) -> float:
+    y = np.asarray(
+        training_series,
+        dtype=float,
+    ).reshape(-1)
+
+    m = max(int(seasonal_period), 1)
+
+    if y.size <= m:
+        raise ValueError(
+            "insufficient data for MASE denominator"
+        )
+
+    scale = float(
+        np.mean(
+            np.abs(
+                y[m:] - y[:-m]
+            )
+        )
+    )
+
+    if not np.isfinite(scale) or scale <= 1e-12:
+        raise ValueError(
+            "invalid MASE denominator"
+        )
+
+    return scale
+
+
+@dataclass
+class FrozenLagRegressor:
+    history: np.ndarray
+    n_lags: int
+    estimator: object
+    x_scaler: object | None
+    y_scaler: object | None
+    model_name: str
+
+    @classmethod
+    def fit_ridge(
+        cls,
+        training_series,
+        n_lags: int,
+        alpha: float,
+    ) -> "FrozenLagRegressor":
+        from sklearn.linear_model import Ridge
+        from sklearn.preprocessing import StandardScaler
+
+        history = np.asarray(
+            training_series,
+            dtype=float,
+        ).reshape(-1)
+
+        X, y = _lagged_xy_raw(
+            history,
+            n_lags,
+        )
+
+        x_scaler = StandardScaler()
+        y_scaler = StandardScaler()
+
+        Xs = x_scaler.fit_transform(X)
+        ys = y_scaler.fit_transform(
+            y.reshape(-1, 1)
+        ).reshape(-1)
+
+        estimator = Ridge(
+            alpha=float(alpha),
+        )
+        estimator.fit(Xs, ys)
+
+        return cls(
+            history=history.copy(),
+            n_lags=int(n_lags),
+            estimator=estimator,
+            x_scaler=x_scaler,
+            y_scaler=y_scaler,
+            model_name="ridge_lag",
+        )
+
+    @classmethod
+    def fit_svr(
+        cls,
+        training_series,
+        n_lags: int,
+        C: float,
+        epsilon: float,
+        gamma,
+    ) -> "FrozenLagRegressor":
+        from sklearn.preprocessing import StandardScaler
+        from sklearn.svm import SVR
+
+        history = np.asarray(
+            training_series,
+            dtype=float,
+        ).reshape(-1)
+
+        X, y = _lagged_xy_raw(
+            history,
+            n_lags,
+        )
+
+        x_scaler = StandardScaler()
+        y_scaler = StandardScaler()
+
+        Xs = x_scaler.fit_transform(X)
+        ys = y_scaler.fit_transform(
+            y.reshape(-1, 1)
+        ).reshape(-1)
+
+        estimator = SVR(
+            kernel="rbf",
+            C=float(C),
+            epsilon=float(epsilon),
+            gamma=gamma,
+        )
+        estimator.fit(Xs, ys)
+
+        return cls(
+            history=history.copy(),
+            n_lags=int(n_lags),
+            estimator=estimator,
+            x_scaler=x_scaler,
+            y_scaler=y_scaler,
+            model_name="svr_rbf",
+        )
+
+    @classmethod
+    def fit_xgboost(
+        cls,
+        training_series,
+        n_lags: int,
+        n_estimators: int,
+        max_depth: int,
+        learning_rate: float,
+        min_child_weight: int,
+    ) -> "FrozenLagRegressor":
+        from xgboost import XGBRegressor
+
+        history = np.asarray(
+            training_series,
+            dtype=float,
+        ).reshape(-1)
+
+        X, y = _lagged_xy_raw(
+            history,
+            n_lags,
+        )
+
+        estimator = XGBRegressor(
+            objective="reg:squarederror",
+            booster="gbtree",
+            tree_method="hist",
+            n_estimators=int(n_estimators),
+            max_depth=int(max_depth),
+            learning_rate=float(learning_rate),
+            min_child_weight=int(min_child_weight),
+            subsample=1.0,
+            colsample_bytree=1.0,
+            reg_lambda=1.0,
+            reg_alpha=0.0,
+            n_jobs=1,
+            random_state=271828,
+            verbosity=0,
+        )
+
+        estimator.fit(X, y)
+
+        return cls(
+            history=history.copy(),
+            n_lags=int(n_lags),
+            estimator=estimator,
+            x_scaler=None,
+            y_scaler=None,
+            model_name="xgboost",
+        )
+
+    @property
+    def nobs(self) -> int:
+        return int(self.history.size)
+
+    def forecast_one(self) -> float:
+        if self.history.size < self.n_lags:
+            raise ValueError(
+                "insufficient observed history"
+            )
+
+        x = self.history[
+            -self.n_lags:
+        ].reshape(1, -1)
+
+        if self.x_scaler is not None:
+            x = self.x_scaler.transform(x)
+
+        pred = np.asarray(
+            self.estimator.predict(x),
+            dtype=float,
+        ).reshape(-1)
+
+        if pred.size != 1:
+            raise ValueError(
+                "lag regressor returned invalid "
+                "forecast length"
+            )
+
+        value = float(pred[0])
+
+        if self.y_scaler is not None:
+            value = float(
+                self.y_scaler.inverse_transform(
+                    np.asarray([[value]])
+                )[0, 0]
+            )
+
+        if not np.isfinite(value):
+            raise ValueError(
+                "lag regressor forecast is non-finite"
+            )
+
+        return value
+
+    def observe(
+        self,
+        observed_value: float,
+    ) -> None:
+        observed = float(observed_value)
+
+        if not np.isfinite(observed):
+            raise ValueError(
+                "observed value must be finite"
+            )
+
+        # Critical B1 rule:
+        # append truth to lag history only.
+        # estimator/scalers are NEVER refitted.
+        self.history = np.append(
+            self.history,
+            observed,
+        )
+
+
+def _validation_mase_for_model(
+    model: FrozenLagRegressor,
+    validation_truth: np.ndarray,
+    inner_fit_series: np.ndarray,
+    seasonal_period: int,
+) -> float:
+    preds = []
+
+    for actual in validation_truth:
+        preds.append(
+            model.forecast_one()
+        )
+        model.observe(float(actual))
+
+    pred = np.asarray(preds, dtype=float)
+    actual = np.asarray(
+        validation_truth,
+        dtype=float,
+    )
+
+    if pred.shape != actual.shape:
+        raise ValueError(
+            "validation forecast length mismatch"
+        )
+
+    if not np.all(np.isfinite(pred)):
+        raise ValueError(
+            "validation forecasts contain non-finite values"
+        )
+
+    scale = _mase_scale(
+        inner_fit_series,
+        seasonal_period,
+    )
+
+    return float(
+        np.mean(np.abs(actual - pred))
+        / scale
+    )
+
+
+@dataclass(frozen=True)
+class RidgeSelection:
+    alpha: float
+    validation_mase: float
+
+
+@dataclass(frozen=True)
+class SVRSelection:
+    C: float
+    epsilon: float
+    gamma: object
+    validation_mase: float
+
+
+@dataclass(frozen=True)
+class XGBSelection:
+    n_estimators: int
+    max_depth: int
+    learning_rate: float
+    min_child_weight: int
+    validation_mase: float
+
+
+def _inner_split(
+    training_series,
+    n_lags: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    y = np.asarray(
+        training_series,
+        dtype=float,
+    ).reshape(-1)
+
+    V = inner_validation_size(
+        y.size,
+        n_lags,
+    )
+
+    inner_fit = y[:-V]
+    validation = y[-V:]
+
+    if inner_fit.size - int(n_lags) < 10:
+        raise ValueError(
+            "inner-fit has fewer than 10 supervised rows"
+        )
+
+    return inner_fit, validation
+
+
+def select_ridge(
+    training_series,
+    n_lags: int,
+    seasonal_period: int,
+    alphas,
+) -> RidgeSelection:
+    inner_fit, validation = _inner_split(
+        training_series,
+        n_lags,
+    )
+
+    scored = []
+
+    for alpha in alphas:
+        model = FrozenLagRegressor.fit_ridge(
+            inner_fit,
+            n_lags=n_lags,
+            alpha=float(alpha),
+        )
+
+        score = _validation_mase_for_model(
+            model,
+            validation,
+            inner_fit,
+            seasonal_period,
+        )
+
+        scored.append(
+            (score, -float(alpha), float(alpha))
+        )
+
+    # minimum MASE; exact tie -> larger alpha.
+    best = min(scored)
+
+    return RidgeSelection(
+        alpha=best[2],
+        validation_mase=best[0],
+    )
+
+
+def select_svr(
+    training_series,
+    n_lags: int,
+    seasonal_period: int,
+    C_values,
+    epsilon_values,
+    gamma_values,
+) -> SVRSelection:
+    inner_fit, validation = _inner_split(
+        training_series,
+        n_lags,
+    )
+
+    scored = []
+
+    for C, epsilon, gamma in product(
+        C_values,
+        epsilon_values,
+        gamma_values,
+    ):
+        model = FrozenLagRegressor.fit_svr(
+            inner_fit,
+            n_lags=n_lags,
+            C=C,
+            epsilon=epsilon,
+            gamma=gamma,
+        )
+
+        score = _validation_mase_for_model(
+            model,
+            validation,
+            inner_fit,
+            seasonal_period,
+        )
+
+        gamma_priority = (
+            0
+            if gamma == "scale"
+            else 1
+        )
+
+        # Frozen tie order:
+        # smaller C -> larger epsilon ->
+        # scale before numeric gamma.
+        scored.append(
+            (
+                score,
+                float(C),
+                -float(epsilon),
+                gamma_priority,
+                C,
+                epsilon,
+                gamma,
+            )
+        )
+
+    best = min(
+        scored,
+        key=lambda row: row[:4],
+    )
+
+    return SVRSelection(
+        C=float(best[4]),
+        epsilon=float(best[5]),
+        gamma=best[6],
+        validation_mase=float(best[0]),
+    )
+
+
+def select_xgboost(
+    training_series,
+    n_lags: int,
+    seasonal_period: int,
+    n_estimators_values,
+    max_depth_values,
+    learning_rate_values,
+    min_child_weight_values,
+) -> XGBSelection:
+    inner_fit, validation = _inner_split(
+        training_series,
+        n_lags,
+    )
+
+    scored = []
+
+    for (
+        n_estimators,
+        max_depth,
+        learning_rate,
+        min_child_weight,
+    ) in product(
+        n_estimators_values,
+        max_depth_values,
+        learning_rate_values,
+        min_child_weight_values,
+    ):
+        model = FrozenLagRegressor.fit_xgboost(
+            inner_fit,
+            n_lags=n_lags,
+            n_estimators=n_estimators,
+            max_depth=max_depth,
+            learning_rate=learning_rate,
+            min_child_weight=min_child_weight,
+        )
+
+        score = _validation_mase_for_model(
+            model,
+            validation,
+            inner_fit,
+            seasonal_period,
+        )
+
+        scored.append(
+            (
+                score,
+                int(n_estimators),
+                int(max_depth),
+                float(learning_rate),
+                -int(min_child_weight),
+            )
+        )
+
+    # Frozen tie order:
+    # fewer trees, shallower depth,
+    # lower learning rate, larger min_child_weight.
+    best = min(scored)
+
+    return XGBSelection(
+        n_estimators=int(best[1]),
+        max_depth=int(best[2]),
+        learning_rate=float(best[3]),
+        min_child_weight=int(-best[4]),
+        validation_mase=float(best[0]),
+    )

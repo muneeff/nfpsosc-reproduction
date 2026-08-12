@@ -622,3 +622,298 @@ def test_frozen_ets_nonseasonal_configuration():
     assert np.isfinite(
         model.forecast_one()
     )
+def make_lag_regression_series(n=90):
+    rng = np.random.default_rng(98765)
+
+    y = np.zeros(n, dtype=float)
+    y[:2] = [1.0, 0.5]
+
+    for t in range(2, n):
+        y[t] = (
+            0.55 * y[t - 1]
+            - 0.20 * y[t - 2]
+            + rng.normal(0.0, 0.15)
+        )
+
+    return y
+
+
+def test_inner_validation_size_matches_frozen_formula():
+    from nfpsosc.v2.baselines import inner_validation_size
+
+    # V=min(max(5,ceil(.20*N_train)), N_train-L-10)
+    assert inner_validation_size(80, 5) == 16
+    assert inner_validation_size(40, 5) == 8
+    assert inner_validation_size(25, 5) == 5
+
+    with pytest.raises(ValueError):
+        inner_validation_size(19, 5)
+
+
+def test_frozen_ridge_fit_once_and_observed_history_updates():
+    from nfpsosc.v2.baselines import FrozenLagRegressor
+
+    y = make_lag_regression_series()
+
+    model = FrozenLagRegressor.fit_ridge(
+        y,
+        n_lags=5,
+        alpha=0.1,
+    )
+
+    estimator_id = id(model.estimator)
+
+    first = model.forecast_one()
+    model.observe(first + 2.0)
+    second = model.forecast_one()
+
+    assert id(model.estimator) == estimator_id
+    assert np.isfinite(first)
+    assert np.isfinite(second)
+
+    # New observed truth entered the lag vector.
+    assert second != pytest.approx(first)
+
+
+def test_frozen_svr_fit_once_and_observed_history_updates():
+    from nfpsosc.v2.baselines import FrozenLagRegressor
+
+    y = make_lag_regression_series()
+
+    model = FrozenLagRegressor.fit_svr(
+        y,
+        n_lags=5,
+        C=10.0,
+        epsilon=0.05,
+        gamma="scale",
+    )
+
+    estimator_id = id(model.estimator)
+
+    first = model.forecast_one()
+    model.observe(first + 2.0)
+    second = model.forecast_one()
+
+    assert id(model.estimator) == estimator_id
+    assert np.isfinite(first)
+    assert np.isfinite(second)
+
+
+def test_frozen_xgboost_fit_once_and_observed_history_updates():
+    from nfpsosc.v2.baselines import FrozenLagRegressor
+
+    y = make_lag_regression_series()
+
+    model = FrozenLagRegressor.fit_xgboost(
+        y,
+        n_lags=5,
+        n_estimators=100,
+        max_depth=2,
+        learning_rate=0.03,
+        min_child_weight=1,
+    )
+
+    estimator_id = id(model.estimator)
+
+    first = model.forecast_one()
+    model.observe(first + 2.0)
+    second = model.forecast_one()
+
+    assert id(model.estimator) == estimator_id
+    assert np.isfinite(first)
+    assert np.isfinite(second)
+
+
+def test_lag_model_rejects_nonfinite_observation():
+    from nfpsosc.v2.baselines import FrozenLagRegressor
+
+    y = make_lag_regression_series()
+
+    model = FrozenLagRegressor.fit_ridge(
+        y,
+        n_lags=5,
+        alpha=1.0,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="observed value must be finite",
+    ):
+        model.observe(np.nan)
+
+
+def test_ridge_tuner_uses_frozen_candidate_grid():
+    from nfpsosc.v2.baselines import select_ridge
+
+    y = make_lag_regression_series()
+
+    selected = select_ridge(
+        y,
+        n_lags=5,
+        seasonal_period=1,
+        alphas=[
+            1e-6,
+            1e-4,
+            1e-2,
+            0.1,
+            1.0,
+            10.0,
+            100.0,
+        ],
+    )
+
+    assert selected.alpha in {
+        1e-6,
+        1e-4,
+        1e-2,
+        0.1,
+        1.0,
+        10.0,
+        100.0,
+    }
+
+    assert np.isfinite(selected.validation_mase)
+
+
+def test_svr_tuner_returns_frozen_grid_member():
+    from nfpsosc.v2.baselines import select_svr
+
+    y = make_lag_regression_series()
+
+    selected = select_svr(
+        y,
+        n_lags=5,
+        seasonal_period=1,
+        C_values=[0.1, 1.0, 10.0, 100.0],
+        epsilon_values=[0.01, 0.05, 0.1],
+        gamma_values=["scale", 0.1, 1.0],
+    )
+
+    assert selected.C in {0.1, 1.0, 10.0, 100.0}
+    assert selected.epsilon in {0.01, 0.05, 0.1}
+    assert selected.gamma in {"scale", 0.1, 1.0}
+    assert np.isfinite(selected.validation_mase)
+
+
+def test_xgboost_tuner_returns_frozen_grid_member():
+    from nfpsosc.v2.baselines import select_xgboost
+
+    y = make_lag_regression_series()
+
+    selected = select_xgboost(
+        y,
+        n_lags=5,
+        seasonal_period=1,
+        n_estimators_values=[100, 300],
+        max_depth_values=[2, 3],
+        learning_rate_values=[0.03, 0.1],
+        min_child_weight_values=[1, 5],
+    )
+
+    assert selected.n_estimators in {100, 300}
+    assert selected.max_depth in {2, 3}
+    assert selected.learning_rate in {0.03, 0.1}
+    assert selected.min_child_weight in {1, 5}
+    assert np.isfinite(selected.validation_mase)
+def test_ridge_has_zero_fit_calls_during_test_window(monkeypatch):
+    from sklearn.linear_model import Ridge
+    from nfpsosc.v2.baselines import FrozenLagRegressor
+
+    y = make_lag_regression_series()
+
+    model = FrozenLagRegressor.fit_ridge(
+        y,
+        n_lags=5,
+        alpha=0.1,
+    )
+
+    def forbidden_fit(*args, **kwargs):
+        raise AssertionError(
+            "Ridge.fit() called during frozen test window"
+        )
+
+    monkeypatch.setattr(
+        Ridge,
+        "fit",
+        forbidden_fit,
+    )
+
+    for _ in range(5):
+        pred = model.forecast_one()
+
+        assert np.isfinite(pred)
+
+        model.observe(
+            pred + 0.25
+        )
+
+
+def test_svr_has_zero_fit_calls_during_test_window(monkeypatch):
+    from sklearn.svm import SVR
+    from nfpsosc.v2.baselines import FrozenLagRegressor
+
+    y = make_lag_regression_series()
+
+    model = FrozenLagRegressor.fit_svr(
+        y,
+        n_lags=5,
+        C=10.0,
+        epsilon=0.05,
+        gamma="scale",
+    )
+
+    def forbidden_fit(*args, **kwargs):
+        raise AssertionError(
+            "SVR.fit() called during frozen test window"
+        )
+
+    monkeypatch.setattr(
+        SVR,
+        "fit",
+        forbidden_fit,
+    )
+
+    for _ in range(5):
+        pred = model.forecast_one()
+
+        assert np.isfinite(pred)
+
+        model.observe(
+            pred + 0.25
+        )
+
+
+def test_xgboost_has_zero_fit_calls_during_test_window(monkeypatch):
+    from xgboost import XGBRegressor
+    from nfpsosc.v2.baselines import FrozenLagRegressor
+
+    y = make_lag_regression_series()
+
+    model = FrozenLagRegressor.fit_xgboost(
+        y,
+        n_lags=5,
+        n_estimators=100,
+        max_depth=2,
+        learning_rate=0.03,
+        min_child_weight=1,
+    )
+
+    def forbidden_fit(*args, **kwargs):
+        raise AssertionError(
+            "XGBRegressor.fit() called during frozen test window"
+        )
+
+    monkeypatch.setattr(
+        XGBRegressor,
+        "fit",
+        forbidden_fit,
+    )
+
+    for _ in range(5):
+        pred = model.forecast_one()
+
+        assert np.isfinite(pred)
+
+        model.observe(
+            pred + 0.25
+        )
