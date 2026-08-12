@@ -1304,3 +1304,423 @@ def select_xgboost(
         min_child_weight=int(-best[4]),
         validation_mase=float(best[0]),
     )
+@dataclass(frozen=True)
+class SARIMACandidate:
+    order: tuple[int, int, int]
+    seasonal_order: tuple[int, int, int, int]
+    trend: str | None
+
+
+@dataclass(frozen=True)
+class ETSCandidate:
+    trend: str | None
+    damped_trend: bool
+    seasonal: str | None
+    seasonal_periods: int | None
+
+
+@dataclass(frozen=True)
+class CandidateFailure:
+    model: str
+    candidate: object
+    error_type: str
+    message: str
+
+
+@dataclass
+class SARIMAAICcSelection:
+    candidate: SARIMACandidate
+    aicc: float
+    model: object
+    failures: list[CandidateFailure]
+
+
+@dataclass
+class ETSAICcSelection:
+    candidate: ETSCandidate
+    aicc: float
+    model: object
+    failures: list[CandidateFailure]
+
+
+class BaselineSelectionError(RuntimeError):
+    def __init__(
+        self,
+        model_name: str,
+        failures: list[CandidateFailure],
+    ):
+        self.model_name = str(model_name)
+        self.failures = list(failures)
+
+        super().__init__(
+            f"{self.model_name}: all candidate models failed; "
+            "no fallback permitted"
+        )
+
+
+def generate_sarima_candidates(
+    seasonal_period: int,
+) -> list[SARIMACandidate]:
+    m = int(seasonal_period)
+
+    if m < 1:
+        raise ValueError(
+            "seasonal_period must be >= 1"
+        )
+
+    candidates = []
+
+    p_values = (0, 1, 2)
+    d_values = (0, 1)
+    q_values = (0, 1, 2)
+
+    if m == 1:
+        seasonal_terms = [
+            (0, 0, 0, 0)
+        ]
+    else:
+        seasonal_terms = [
+            (P, D, Q, m)
+            for P in (0, 1)
+            for D in (0, 1)
+            for Q in (0, 1)
+        ]
+
+    for p in p_values:
+        for d in d_values:
+            for q in q_values:
+                for seasonal_order in seasonal_terms:
+                    P, D, Q, _ = seasonal_order
+
+                    if (
+                        p + q + P + Q
+                        > 4
+                    ):
+                        continue
+
+                    # Frozen protocol:
+                    # constant is permitted only if
+                    # d == 0 and D == 0.
+                    trends = (
+                        (None, "c")
+                        if d == 0 and D == 0
+                        else (None,)
+                    )
+
+                    for trend in trends:
+                        candidates.append(
+                            SARIMACandidate(
+                                order=(
+                                    p,
+                                    d,
+                                    q,
+                                ),
+                                seasonal_order=(
+                                    seasonal_order
+                                ),
+                                trend=trend,
+                            )
+                        )
+
+    return candidates
+
+
+def sarima_tie_key(
+    candidate: SARIMACandidate,
+) -> tuple:
+    """
+    V2-A001 exact AICc tie-break.
+
+    1 smaller p+q+P+Q
+    2 smaller P+Q
+    3 smaller p+q
+    4 smaller d+D
+    5 smaller D
+    6 lexicographic
+      (p,d,q,P,D,Q,trend_code)
+    """
+    p, d, q = candidate.order
+    P, D, Q, _ = candidate.seasonal_order
+
+    trend_code = (
+        0
+        if candidate.trend is None
+        else 1
+    )
+
+    return (
+        p + q + P + Q,
+        P + Q,
+        p + q,
+        d + D,
+        D,
+        p,
+        d,
+        q,
+        P,
+        D,
+        Q,
+        trend_code,
+    )
+
+
+def generate_ets_candidates(
+    seasonal_period: int,
+) -> list[ETSCandidate]:
+    m = int(seasonal_period)
+
+    if m < 1:
+        raise ValueError(
+            "seasonal_period must be >= 1"
+        )
+
+    seasonal_values = (
+        (None,)
+        if m == 1
+        else (None, "add")
+    )
+
+    candidates = []
+
+    for seasonal in seasonal_values:
+        seasonal_periods = (
+            None
+            if seasonal is None
+            else m
+        )
+
+        # No trend -> damping is prohibited.
+        candidates.append(
+            ETSCandidate(
+                trend=None,
+                damped_trend=False,
+                seasonal=seasonal,
+                seasonal_periods=seasonal_periods,
+            )
+        )
+
+        # Additive trend:
+        # both undamped and damped are allowed.
+        for damped in (
+            False,
+            True,
+        ):
+            candidates.append(
+                ETSCandidate(
+                    trend="add",
+                    damped_trend=damped,
+                    seasonal=seasonal,
+                    seasonal_periods=seasonal_periods,
+                )
+            )
+
+    return candidates
+
+
+def ets_tie_key(
+    candidate: ETSCandidate,
+) -> tuple:
+    """
+    V2-A001 exact AICc tie-break.
+    """
+    trend_code = int(
+        candidate.trend == "add"
+    )
+
+    seasonal_code = int(
+        candidate.seasonal == "add"
+    )
+
+    component_count = (
+        trend_code
+        + seasonal_code
+    )
+
+    damped_code = int(
+        candidate.damped_trend
+    )
+
+    return (
+        component_count,
+        damped_code,
+        seasonal_code,
+        trend_code,
+    )
+
+
+def _fit_sarima_candidate(
+    training_series,
+    candidate: SARIMACandidate,
+):
+    return FrozenSARIMA.fit(
+        training_series,
+        order=candidate.order,
+        seasonal_order=(
+            candidate.seasonal_order
+        ),
+        trend=candidate.trend,
+    )
+
+
+def _fit_ets_candidate(
+    training_series,
+    candidate: ETSCandidate,
+):
+    return FrozenETS.fit(
+        training_series,
+        trend=candidate.trend,
+        damped_trend=(
+            candidate.damped_trend
+        ),
+        seasonal=candidate.seasonal,
+        seasonal_periods=(
+            candidate.seasonal_periods
+        ),
+    )
+
+
+def select_sarima_aicc(
+    training_series,
+    seasonal_period: int,
+) -> SARIMAAICcSelection:
+    candidates = generate_sarima_candidates(
+        seasonal_period
+    )
+
+    failures = []
+    successes = []
+
+    for candidate in candidates:
+        try:
+            model = _fit_sarima_candidate(
+                training_series,
+                candidate,
+            )
+
+            aicc = float(
+                model.aicc
+            )
+
+            if not np.isfinite(aicc):
+                raise ValueError(
+                    "non-finite SARIMA AICc"
+                )
+
+            successes.append(
+                (
+                    aicc,
+                    sarima_tie_key(
+                        candidate
+                    ),
+                    candidate,
+                    model,
+                )
+            )
+
+        except Exception as exc:
+            failures.append(
+                CandidateFailure(
+                    model="sarima",
+                    candidate=candidate,
+                    error_type=(
+                        type(exc).__name__
+                    ),
+                    message=str(exc),
+                )
+            )
+
+    if not successes:
+        raise BaselineSelectionError(
+            "SARIMA",
+            failures,
+        )
+
+    # Exact numeric AICc comparison first.
+    # Tie-break is consulted only when
+    # the finite AICc values are equal.
+    best = min(
+        successes,
+        key=lambda row: (
+            row[0],
+            row[1],
+        ),
+    )
+
+    return SARIMAAICcSelection(
+        candidate=best[2],
+        aicc=float(best[0]),
+        model=best[3],
+        failures=failures,
+    )
+
+
+def select_ets_aicc(
+    training_series,
+    seasonal_period: int,
+) -> ETSAICcSelection:
+    candidates = generate_ets_candidates(
+        seasonal_period
+    )
+
+    failures = []
+    successes = []
+
+    for candidate in candidates:
+        try:
+            model = _fit_ets_candidate(
+                training_series,
+                candidate,
+            )
+
+            aicc = float(
+                model.aicc
+            )
+
+            if not np.isfinite(aicc):
+                raise ValueError(
+                    "non-finite ETS AICc"
+                )
+
+            successes.append(
+                (
+                    aicc,
+                    ets_tie_key(
+                        candidate
+                    ),
+                    candidate,
+                    model,
+                )
+            )
+
+        except Exception as exc:
+            failures.append(
+                CandidateFailure(
+                    model="ets",
+                    candidate=candidate,
+                    error_type=(
+                        type(exc).__name__
+                    ),
+                    message=str(exc),
+                )
+            )
+
+    if not successes:
+        raise BaselineSelectionError(
+            "ETS",
+            failures,
+        )
+
+    best = min(
+        successes,
+        key=lambda row: (
+            row[0],
+            row[1],
+        ),
+    )
+
+    return ETSAICcSelection(
+        candidate=best[2],
+        aicc=float(best[0]),
+        model=best[3],
+        failures=failures,
+    )

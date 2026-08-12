@@ -917,3 +917,354 @@ def test_xgboost_has_zero_fit_calls_during_test_window(monkeypatch):
         model.observe(
             pred + 0.25
         )
+def test_sarima_candidates_nonseasonal_are_exactly_frozen_grid():
+    from nfpsosc.v2.baselines import generate_sarima_candidates
+
+    candidates = generate_sarima_candidates(
+        seasonal_period=1,
+    )
+
+    # 9 ARMA combinations *:
+    # d=0 -> no-constant + constant = 18
+    # d=1 -> no-constant only = 9
+    assert len(candidates) == 27
+
+    for candidate in candidates:
+        p, d, q = candidate.order
+        P, D, Q, m = candidate.seasonal_order
+
+        assert p in {0, 1, 2}
+        assert d in {0, 1}
+        assert q in {0, 1, 2}
+
+        assert (P, D, Q, m) == (0, 0, 0, 0)
+
+        assert p + q <= 4
+
+        if candidate.trend == "c":
+            assert d == 0
+        else:
+            assert candidate.trend is None
+
+
+def test_sarima_candidates_seasonal_obey_all_frozen_constraints():
+    from nfpsosc.v2.baselines import generate_sarima_candidates
+
+    candidates = generate_sarima_candidates(
+        seasonal_period=12,
+    )
+
+    assert len(candidates) == 155
+
+    for candidate in candidates:
+        p, d, q = candidate.order
+        P, D, Q, m = candidate.seasonal_order
+
+        assert p in {0, 1, 2}
+        assert d in {0, 1}
+        assert q in {0, 1, 2}
+
+        assert P in {0, 1}
+        assert D in {0, 1}
+        assert Q in {0, 1}
+        assert m == 12
+
+        assert p + q + P + Q <= 4
+
+        if candidate.trend == "c":
+            assert d == 0
+            assert D == 0
+
+
+def test_sarima_tie_break_prefers_frozen_complexity_order():
+    from nfpsosc.v2.baselines import (
+        SARIMACandidate,
+        sarima_tie_key,
+    )
+
+    simpler = SARIMACandidate(
+        order=(1, 0, 0),
+        seasonal_order=(0, 0, 0, 12),
+        trend=None,
+    )
+
+    more_complex = SARIMACandidate(
+        order=(1, 0, 1),
+        seasonal_order=(0, 0, 0, 12),
+        trend=None,
+    )
+
+    assert sarima_tie_key(
+        simpler
+    ) < sarima_tie_key(
+        more_complex
+    )
+
+
+def test_sarima_exact_tie_prefers_no_constant_last():
+    from nfpsosc.v2.baselines import (
+        SARIMACandidate,
+        sarima_tie_key,
+    )
+
+    no_constant = SARIMACandidate(
+        order=(1, 0, 0),
+        seasonal_order=(0, 0, 0, 12),
+        trend=None,
+    )
+
+    constant = SARIMACandidate(
+        order=(1, 0, 0),
+        seasonal_order=(0, 0, 0, 12),
+        trend="c",
+    )
+
+    assert sarima_tie_key(
+        no_constant
+    ) < sarima_tie_key(
+        constant
+    )
+
+
+def test_ets_candidates_nonseasonal_are_exactly_three():
+    from nfpsosc.v2.baselines import generate_ets_candidates
+
+    candidates = generate_ets_candidates(
+        seasonal_period=1,
+    )
+
+    assert len(candidates) == 3
+
+    structures = {
+        (
+            c.trend,
+            c.damped_trend,
+            c.seasonal,
+            c.seasonal_periods,
+        )
+        for c in candidates
+    }
+
+    assert structures == {
+        (None, False, None, None),
+        ("add", False, None, None),
+        ("add", True, None, None),
+    }
+
+
+def test_ets_candidates_seasonal_are_exactly_six():
+    from nfpsosc.v2.baselines import generate_ets_candidates
+
+    candidates = generate_ets_candidates(
+        seasonal_period=12,
+    )
+
+    assert len(candidates) == 6
+
+    for candidate in candidates:
+        assert candidate.trend in {
+            None,
+            "add",
+        }
+
+        assert candidate.seasonal in {
+            None,
+            "add",
+        }
+
+        if candidate.trend is None:
+            assert candidate.damped_trend is False
+
+        if candidate.seasonal is None:
+            assert candidate.seasonal_periods is None
+        else:
+            assert candidate.seasonal_periods == 12
+
+
+def test_ets_tie_break_prefers_simpler_structure():
+    from nfpsosc.v2.baselines import (
+        ETSCandidate,
+        ets_tie_key,
+    )
+
+    simplest = ETSCandidate(
+        trend=None,
+        damped_trend=False,
+        seasonal=None,
+        seasonal_periods=None,
+    )
+
+    trend_only = ETSCandidate(
+        trend="add",
+        damped_trend=False,
+        seasonal=None,
+        seasonal_periods=None,
+    )
+
+    trend_and_season = ETSCandidate(
+        trend="add",
+        damped_trend=False,
+        seasonal="add",
+        seasonal_periods=12,
+    )
+
+    assert ets_tie_key(
+        simplest
+    ) < ets_tie_key(
+        trend_only
+    )
+
+    assert ets_tie_key(
+        trend_only
+    ) < ets_tie_key(
+        trend_and_season
+    )
+
+
+def test_sarima_selector_skips_failure_and_logs_it(monkeypatch):
+    import types
+    import nfpsosc.v2.baselines as baselines
+
+    y = make_ar_series()
+
+    calls = []
+
+    def fake_fit(training_series, candidate):
+        calls.append(candidate)
+
+        if candidate == baselines.generate_sarima_candidates(1)[0]:
+            raise RuntimeError("synthetic candidate failure")
+
+        score = (
+            1.0
+            if candidate.order == (1, 0, 0)
+            and candidate.trend is None
+            else 10.0
+        )
+
+        return types.SimpleNamespace(
+            aicc=score,
+        )
+
+    monkeypatch.setattr(
+        baselines,
+        "_fit_sarima_candidate",
+        fake_fit,
+    )
+
+    selected = baselines.select_sarima_aicc(
+        y,
+        seasonal_period=1,
+    )
+
+    assert selected.candidate.order == (
+        1,
+        0,
+        0,
+    )
+    assert selected.candidate.trend is None
+    assert selected.aicc == pytest.approx(1.0)
+
+    assert len(selected.failures) == 1
+    assert (
+        selected.failures[0].error_type
+        == "RuntimeError"
+    )
+
+    assert "synthetic candidate failure" in (
+        selected.failures[0].message
+    )
+
+
+def test_ets_selector_uses_tie_break_after_equal_aicc(monkeypatch):
+    import types
+    import nfpsosc.v2.baselines as baselines
+
+    y = make_ets_series()
+
+    def fake_fit(training_series, candidate):
+        return types.SimpleNamespace(
+            aicc=5.0,
+        )
+
+    monkeypatch.setattr(
+        baselines,
+        "_fit_ets_candidate",
+        fake_fit,
+    )
+
+    selected = baselines.select_ets_aicc(
+        y,
+        seasonal_period=12,
+    )
+
+    # All AICc values are exactly tied:
+    # Amendment V2-A001 must select simplest ETS.
+    assert selected.candidate.trend is None
+    assert selected.candidate.damped_trend is False
+    assert selected.candidate.seasonal is None
+    assert selected.candidate.seasonal_periods is None
+
+
+def test_sarima_all_candidates_fail_without_fallback(monkeypatch):
+    import nfpsosc.v2.baselines as baselines
+
+    y = make_ar_series()
+
+    def always_fail(training_series, candidate):
+        raise RuntimeError(
+            "forced SARIMA failure"
+        )
+
+    monkeypatch.setattr(
+        baselines,
+        "_fit_sarima_candidate",
+        always_fail,
+    )
+
+    with pytest.raises(
+        baselines.BaselineSelectionError,
+        match="no fallback permitted",
+    ) as exc_info:
+        baselines.select_sarima_aicc(
+            y,
+            seasonal_period=1,
+        )
+
+    assert len(
+        exc_info.value.failures
+    ) == len(
+        baselines.generate_sarima_candidates(1)
+    )
+
+
+def test_ets_all_candidates_fail_without_fallback(monkeypatch):
+    import nfpsosc.v2.baselines as baselines
+
+    y = make_ets_series()
+
+    def always_fail(training_series, candidate):
+        raise RuntimeError(
+            "forced ETS failure"
+        )
+
+    monkeypatch.setattr(
+        baselines,
+        "_fit_ets_candidate",
+        always_fail,
+    )
+
+    with pytest.raises(
+        baselines.BaselineSelectionError,
+        match="no fallback permitted",
+    ) as exc_info:
+        baselines.select_ets_aicc(
+            y,
+            seasonal_period=12,
+        )
+
+    assert len(
+        exc_info.value.failures
+    ) == len(
+        baselines.generate_ets_candidates(12)
+    )
