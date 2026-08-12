@@ -1144,6 +1144,7 @@ def test_sarima_selector_skips_failure_and_logs_it(monkeypatch):
 
         return types.SimpleNamespace(
             aicc=score,
+            converged=True,
         )
 
     monkeypatch.setattr(
@@ -1185,6 +1186,7 @@ def test_ets_selector_uses_tie_break_after_equal_aicc(monkeypatch):
     def fake_fit(training_series, candidate):
         return types.SimpleNamespace(
             aicc=5.0,
+            optimizer_success=True,
         )
 
     monkeypatch.setattr(
@@ -1268,3 +1270,121 @@ def test_ets_all_candidates_fail_without_fallback(monkeypatch):
     ) == len(
         baselines.generate_ets_candidates(12)
     )
+def test_sarima_nonconverged_best_aicc_cannot_win(monkeypatch):
+    import types
+    import nfpsosc.v2.baselines as baselines
+
+    y = make_ar_series()
+
+    candidates = baselines.generate_sarima_candidates(1)
+    bad = candidates[0]
+    good = candidates[1]
+
+    def fake_fit(training_series, candidate):
+        if candidate == bad:
+            # Deliberately best AICc, but invalid numerically.
+            return types.SimpleNamespace(
+                aicc=-1000.0,
+                converged=False,
+            )
+
+        if candidate == good:
+            return types.SimpleNamespace(
+                aicc=1.0,
+                converged=True,
+            )
+
+        return types.SimpleNamespace(
+            aicc=10.0,
+            converged=True,
+        )
+
+    monkeypatch.setattr(
+        baselines,
+        "_fit_sarima_candidate",
+        fake_fit,
+    )
+
+    selected = baselines.select_sarima_aicc(
+        y,
+        seasonal_period=1,
+    )
+
+    assert selected.candidate == good
+    assert selected.aicc == pytest.approx(1.0)
+
+    failures = [
+        failure
+        for failure in selected.failures
+        if failure.candidate == bad
+    ]
+
+    assert len(failures) == 1
+
+    assert (
+        failures[0].error_type
+        == "CandidateValidationError"
+    )
+
+    assert "did not converge" in failures[0].message
+
+
+def test_ets_unsuccessful_optimizer_best_aicc_cannot_win(
+    monkeypatch,
+):
+    import types
+    import nfpsosc.v2.baselines as baselines
+
+    y = make_ets_series()
+
+    candidates = baselines.generate_ets_candidates(12)
+    bad = candidates[0]
+    good = candidates[1]
+
+    def fake_fit(training_series, candidate):
+        if candidate == bad:
+            # Deliberately best AICc, but optimizer failed.
+            return types.SimpleNamespace(
+                aicc=-1000.0,
+                optimizer_success=False,
+            )
+
+        if candidate == good:
+            return types.SimpleNamespace(
+                aicc=1.0,
+                optimizer_success=True,
+            )
+
+        return types.SimpleNamespace(
+            aicc=10.0,
+            optimizer_success=True,
+        )
+
+    monkeypatch.setattr(
+        baselines,
+        "_fit_ets_candidate",
+        fake_fit,
+    )
+
+    selected = baselines.select_ets_aicc(
+        y,
+        seasonal_period=12,
+    )
+
+    assert selected.candidate == good
+    assert selected.aicc == pytest.approx(1.0)
+
+    failures = [
+        failure
+        for failure in selected.failures
+        if failure.candidate == bad
+    ]
+
+    assert len(failures) == 1
+
+    assert (
+        failures[0].error_type
+        == "CandidateValidationError"
+    )
+
+    assert "optimizer did not converge" in failures[0].message

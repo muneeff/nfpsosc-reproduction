@@ -379,6 +379,34 @@ class FrozenSARIMA:
     def aicc(self) -> float:
         return float(self._result.aicc)
 
+    @property
+    def converged(self) -> bool:
+        """
+        True only when statsmodels explicitly reports successful
+        maximum-likelihood convergence.
+        """
+        retvals = getattr(
+            self._result,
+            "mle_retvals",
+            None,
+        )
+
+        if not isinstance(retvals, dict):
+            return False
+
+        flag = retvals.get(
+            "converged",
+            None,
+        )
+
+        if not isinstance(
+            flag,
+            (bool, np.bool_),
+        ):
+            return False
+
+        return bool(flag)
+
     def forecast_one(self) -> float:
         forecast = self._result.forecast(
             steps=1
@@ -459,6 +487,7 @@ class FrozenETS:
     initial_seasons: np.ndarray | None
 
     selection_aicc: float
+    optimizer_success: bool
 
     @classmethod
     def fit(
@@ -612,6 +641,41 @@ class FrozenETS:
                 "ETS fitted AICc is non-finite"
             )
 
+        mle_retvals = getattr(
+            result,
+            "mle_retvals",
+            None,
+        )
+
+        optimizer_success = False
+
+        if mle_retvals is not None:
+            success = getattr(
+                mle_retvals,
+                "success",
+                None,
+            )
+
+            if (
+                success is None
+                and isinstance(
+                    mle_retvals,
+                    dict,
+                )
+            ):
+                success = mle_retvals.get(
+                    "success",
+                    None,
+                )
+
+            if isinstance(
+                success,
+                (bool, np.bool_),
+            ):
+                optimizer_success = bool(
+                    success
+                )
+
         return cls(
             history=y.copy(),
             trend=trend,
@@ -626,6 +690,7 @@ class FrozenETS:
             initial_trend=initial_trend,
             initial_seasons=initial_seasons,
             selection_aicc=aicc,
+            optimizer_success=optimizer_success,
         )
 
     @property
@@ -1343,6 +1408,10 @@ class ETSAICcSelection:
     failures: list[CandidateFailure]
 
 
+class CandidateValidationError(RuntimeError):
+    """Candidate fit completed but is numerically invalid."""
+
+
 class BaselineSelectionError(RuntimeError):
     def __init__(
         self,
@@ -1592,17 +1661,40 @@ def select_sarima_aicc(
 
     for candidate in candidates:
         try:
-            model = _fit_sarima_candidate(
-                training_series,
-                candidate,
+            import warnings
+
+            from statsmodels.tools.sm_exceptions import (
+                ConvergenceWarning,
             )
+
+            with warnings.catch_warnings():
+                warnings.simplefilter(
+                    "ignore",
+                    ConvergenceWarning,
+                )
+
+                model = _fit_sarima_candidate(
+                    training_series,
+                    candidate,
+                )
+
+            if not bool(
+                getattr(
+                    model,
+                    "converged",
+                    False,
+                )
+            ):
+                raise CandidateValidationError(
+                    "SARIMA candidate did not converge"
+                )
 
             aicc = float(
                 model.aicc
             )
 
             if not np.isfinite(aicc):
-                raise ValueError(
+                raise CandidateValidationError(
                     "non-finite SARIMA AICc"
                 )
 
@@ -1667,17 +1759,40 @@ def select_ets_aicc(
 
     for candidate in candidates:
         try:
-            model = _fit_ets_candidate(
-                training_series,
-                candidate,
+            import warnings
+
+            from statsmodels.tools.sm_exceptions import (
+                ConvergenceWarning,
             )
+
+            with warnings.catch_warnings():
+                warnings.simplefilter(
+                    "ignore",
+                    ConvergenceWarning,
+                )
+
+                model = _fit_ets_candidate(
+                    training_series,
+                    candidate,
+                )
+
+            if not bool(
+                getattr(
+                    model,
+                    "optimizer_success",
+                    False,
+                )
+            ):
+                raise CandidateValidationError(
+                    "ETS optimizer did not converge"
+                )
 
             aicc = float(
                 model.aicc
             )
 
             if not np.isfinite(aicc):
-                raise ValueError(
+                raise CandidateValidationError(
                     "non-finite ETS AICc"
                 )
 
