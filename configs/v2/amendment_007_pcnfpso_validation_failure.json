@@ -1,0 +1,45 @@
+{
+  "amendment_id": "V2-A007",
+  "status": "LOCKED_BEFORE_DEVELOPMENT",
+  "title": "PC-NFPSO chronological-validation size and development run-failure semantics",
+  "parent_protocol_commit": "d1c2d24ab3f8677be409a9b9a6ca139a32310ac8",
+  "parent_code_commit": "0d16e4565a93c9dff743673a0ba7d0b3c55400a9",
+  "reason": "The Gate-2 freeze specifies that PC-NFPSO uses a fitting segment followed by chronological validation, but it does not explicitly freeze the PC-NFPSO validation-tail size. The baseline-tuning validation formula is baseline-specific and must not be silently reused. Development-run failure handling also affects whether a radius-alpha pair can enter selection and is therefore frozen here before any development outcome is generated.",
+  "pc_nfpso_validation": {
+    "scope": "all V2 PC-NFPSO base-model training runs unless an ablation explicitly states otherwise",
+    "pretest_supervised_rows": "N = len(raw_pretest) - L after the frozen contiguous lag construction",
+    "validation_size": "V = max(8, floor(0.20*N))",
+    "minimum_fitting_rows": 11,
+    "validity_rule": "require N - V >= 11",
+    "chronology": "the last V supervised rows of the pre-test window are validation; all earlier supervised rows are fitting",
+    "scaler_rule": "A004 applies unchanged: fit the scaler only through the final fitting target, then freeze it for validation, optimization, full-pretest consequent refit, and test forecasting",
+    "distinction_from_baselines": "This is the PC-NFPSO method-validation rule. It is not the baseline inner-tuning formula V=min(max(5,ceil(0.20*N_train)), N_train-L-10).",
+    "inheritance_note": "The max(8, floor(0.20*N)) rule is the leakage-aware V1 research-baseline PC-NFPSO validation rule, now made explicit for V2 before development."
+  },
+  "synthetic_development_split": {
+    "series_length": 180,
+    "pretest_length": 144,
+    "test_length": 36,
+    "split": "first 144 observations are pre-test training; final 36 observations are test",
+    "lag_rule": "L=min(12,max(5,m)) using the frozen generator seasonal period m",
+    "expected_validation_size_if_L5": 27,
+    "expected_validation_size_if_L12": 26
+  },
+  "development_accuracy": {
+    "mase_denominator": "mean(abs(y_train[t]-y_train[t-m])) over the raw pre-test training window only",
+    "minimum_denominator": 1e-12,
+    "test_used_in_denominator": false,
+    "forecast_policy": "fixed fitted parameters; append observed true test value after each one-step forecast"
+  },
+  "development_run_failure_policy": {
+    "silent_fallback": false,
+    "prediction_substitution": false,
+    "failed_run_mase_imputation": false,
+    "failed_run_pair_deletion": false,
+    "logging": "record deterministic run_id, stage, exception type, and exception message",
+    "selection_gate": "Global radius-alpha selection is prohibited unless every expected development run has succeeded with a finite non-negative MASE.",
+    "expected_successful_score_count": 28350,
+    "rationale": "A failed run is an operational result, not an accuracy value. Converting failures to an arbitrary MASE penalty or dropping them could change hyperparameter selection."
+  },
+  "scientific_effect": "Clarifies an inherited PC-NFPSO validation rule and fail-closed selection semantics before any V2 development or final performance outcome is generated or inspected."
+}
