@@ -1,0 +1,49 @@
+{
+  "amendment_id": "V2-A004",
+  "status": "LOCKED_BEFORE_DEVELOPMENT",
+  "title": "TSK implementation and coupled radius-ridge selection clarifications",
+  "parent_protocol_commit": "d1c2d24ab3f8677be409a9b9a6ca139a32310ac8",
+  "parent_code_commit": "490edf31946a25eb0db3177998d4d3ada730530d",
+  "scaling": {
+    "method": "affine min-max",
+    "output_interval": [
+      0.1,
+      0.9
+    ],
+    "fit_scope": "raw observations available through the final fitting target only; chronological-validation targets and all test observations excluded",
+    "freeze_policy": "the fitting-segment scaler remains frozen for validation, antecedent optimization, complete-pretest consequent refit, and test forecasting; it is not refit after antecedent optimization"
+  },
+  "subtractive_clustering_initialization": {
+    "data": "joint column matrix [X_fit, y_fit] in the frozen scaled domain",
+    "algorithm": "deterministic Chiu-style subtractive clustering inherited from V1",
+    "antecedent_centers": "retain only the X dimensions of accepted joint centers",
+    "feature_range": "max(ptp(X_fit[:,j]),1e-3)",
+    "initial_sigma": "radius*feature_range/sqrt(8)",
+    "particle0": "concatenate centers and positive widths, then clip to the already frozen antecedent bounds"
+  },
+  "ridge_solve": {
+    "regularized_parameters": "all first-order TSK consequent coefficients including intercepts",
+    "system": "solve (Phi.T Phi + alpha I) beta = Phi.T y",
+    "alpha_default": "none; alpha must be supplied explicitly from the frozen selection procedure"
+  },
+  "coupled_radius_ridge_selection": {
+    "candidate_pairs": "Cartesian product of frozen radius grid and frozen alpha grid",
+    "domain": "synthetic development only",
+    "condition_value": "median MASE across paired optimizer replicates within each development forecasting condition",
+    "selection_statistic": "median of condition values across development conditions",
+    "lower_is_better": true,
+    "tie_break": [
+      "larger radius",
+      "then larger alpha"
+    ],
+    "final_access": false,
+    "real_series_retuning": false
+  },
+  "firing_numerics": {
+    "raw_log_firing": "-0.5*sum(((x-center)/sigma)^2)",
+    "normalized_weights": "stable log-sum-exp softmax of raw log firing strengths",
+    "coverage_penalty": "compute from log total firing with numerical floor log(1e-300), algebraically equivalent to the frozen definition",
+    "jacobian": "analytic derivative must be consistent with the same normalized-weight definition and validated against finite differences"
+  },
+  "scientific_effect": "clarifies previously underspecified implementation details before development; does not use development or final performance outcomes"
+}
