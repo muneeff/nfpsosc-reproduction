@@ -1839,3 +1839,865 @@ def select_ets_aicc(
         model=best[3],
         failures=failures,
     )
+@dataclass
+class FrozenNaive1:
+    last_value: float
+    nobs: int
+
+    @classmethod
+    def fit(
+        cls,
+        training_series,
+    ) -> "FrozenNaive1":
+        y = np.asarray(
+            training_series,
+            dtype=float,
+        ).reshape(-1)
+
+        if y.size < 1:
+            raise ValueError(
+                "naive_1 requires non-empty training data"
+            )
+
+        if not np.all(np.isfinite(y)):
+            raise ValueError(
+                "naive_1 training series contains "
+                "non-finite values"
+            )
+
+        return cls(
+            last_value=float(y[-1]),
+            nobs=int(y.size),
+        )
+
+    def forecast_one(self) -> float:
+        return float(
+            self.last_value
+        )
+
+    def observe(
+        self,
+        observed_value: float,
+    ) -> None:
+        observed = float(
+            observed_value
+        )
+
+        if not np.isfinite(observed):
+            raise ValueError(
+                "observed value must be finite"
+            )
+
+        self.last_value = observed
+        self.nobs += 1
+
+
+@dataclass
+class FrozenSeasonalNaive:
+    history: np.ndarray
+    seasonal_period: int
+
+    @classmethod
+    def fit(
+        cls,
+        training_series,
+        seasonal_period: int,
+    ) -> "FrozenSeasonalNaive":
+        y = np.asarray(
+            training_series,
+            dtype=float,
+        ).reshape(-1)
+
+        m = int(
+            seasonal_period
+        )
+
+        if m <= 1:
+            raise ValueError(
+                "seasonal_naive is available only when m>1"
+            )
+
+        if y.size < m:
+            raise ValueError(
+                "insufficient training history "
+                "for seasonal_naive"
+            )
+
+        if not np.all(np.isfinite(y)):
+            raise ValueError(
+                "seasonal_naive training series contains "
+                "non-finite values"
+            )
+
+        return cls(
+            history=y.copy(),
+            seasonal_period=m,
+        )
+
+    def forecast_one(self) -> float:
+        value = float(
+            self.history[
+                -self.seasonal_period
+            ]
+        )
+
+        if not np.isfinite(value):
+            raise ValueError(
+                "seasonal_naive forecast is non-finite"
+            )
+
+        return value
+
+    def observe(
+        self,
+        observed_value: float,
+    ) -> None:
+        observed = float(
+            observed_value
+        )
+
+        if not np.isfinite(observed):
+            raise ValueError(
+                "observed value must be finite"
+            )
+
+        self.history = np.append(
+            self.history,
+            observed,
+        )
+
+
+@dataclass
+class FrozenDrift:
+    last_value: float
+    slope: float
+    nobs: int
+
+    @classmethod
+    def fit(
+        cls,
+        training_series,
+    ) -> "FrozenDrift":
+        y = np.asarray(
+            training_series,
+            dtype=float,
+        ).reshape(-1)
+
+        if y.size < 2:
+            raise ValueError(
+                "drift requires at least two "
+                "training observations"
+            )
+
+        if not np.all(np.isfinite(y)):
+            raise ValueError(
+                "drift training series contains "
+                "non-finite values"
+            )
+
+        slope = float(
+            (y[-1] - y[0])
+            / (y.size - 1)
+        )
+
+        if not np.isfinite(slope):
+            raise ValueError(
+                "drift slope is non-finite"
+            )
+
+        return cls(
+            last_value=float(y[-1]),
+            slope=slope,
+            nobs=int(y.size),
+        )
+
+    def forecast_one(self) -> float:
+        value = float(
+            self.last_value
+            + self.slope
+        )
+
+        if not np.isfinite(value):
+            raise ValueError(
+                "drift forecast is non-finite"
+            )
+
+        return value
+
+    def observe(
+        self,
+        observed_value: float,
+    ) -> None:
+        observed = float(
+            observed_value
+        )
+
+        if not np.isfinite(observed):
+            raise ValueError(
+                "observed value must be finite"
+            )
+
+        # B1: the drift parameter is frozen.
+        # Only the observed level advances.
+        self.last_value = observed
+        self.nobs += 1
+
+
+@dataclass(frozen=True)
+class BaselineRunFailure:
+    model: str
+    stage: str
+    origin: int | None
+    error_type: str
+    message: str
+
+
+@dataclass
+class BaselineRunResult:
+    model: str
+    status: str
+
+    y_true: np.ndarray
+    y_pred: np.ndarray
+    test_indices: np.ndarray
+
+    selected_config: dict
+    selection_failures: list[CandidateFailure]
+
+    failure: BaselineRunFailure | None
+
+    update_policy: str
+    substitution_used: bool = False
+
+    @property
+    def metrics_eligible(self) -> bool:
+        return (
+            self.status == "success"
+            and self.failure is None
+            and not self.substitution_used
+        )
+
+
+class BaselineQCError(RuntimeError):
+    pass
+
+
+V2_UPDATE_POLICY = (
+    "fixed_model_parameters_with_observed_history"
+)
+
+
+def _frozen_lag_from_m(
+    seasonal_period: int,
+) -> int:
+    m = int(
+        seasonal_period
+    )
+
+    if m < 1:
+        raise ValueError(
+            "seasonal_period must be >= 1"
+        )
+
+    return int(
+        min(
+            12,
+            max(
+                5,
+                m,
+            ),
+        )
+    )
+
+
+def _prepare_baseline_v2(
+    training_series,
+    model: str,
+    seasonal_period: int,
+):
+    name = str(
+        model
+    ).strip().lower()
+
+    m = int(
+        seasonal_period
+    )
+
+    L = _frozen_lag_from_m(
+        m
+    )
+
+    selection_failures = []
+
+    if name == "naive_1":
+        fitted = FrozenNaive1.fit(
+            training_series
+        )
+
+        config = {
+            "tuning": "none",
+        }
+
+    elif name == "seasonal_naive":
+        fitted = FrozenSeasonalNaive.fit(
+            training_series,
+            seasonal_period=m,
+        )
+
+        config = {
+            "tuning": "none",
+            "seasonal_period": m,
+        }
+
+    elif name == "drift":
+        fitted = FrozenDrift.fit(
+            training_series
+        )
+
+        config = {
+            "tuning": "none",
+            "slope": fitted.slope,
+        }
+
+    elif name == "sarima":
+        selection = select_sarima_aicc(
+            training_series,
+            seasonal_period=m,
+        )
+
+        fitted = selection.model
+
+        selection_failures = list(
+            selection.failures
+        )
+
+        config = {
+            "order": selection.candidate.order,
+            "seasonal_order": (
+                selection.candidate.seasonal_order
+            ),
+            "trend": selection.candidate.trend,
+            "aicc": float(
+                selection.aicc
+            ),
+        }
+
+    elif name == "ets":
+        selection = select_ets_aicc(
+            training_series,
+            seasonal_period=m,
+        )
+
+        fitted = selection.model
+
+        selection_failures = list(
+            selection.failures
+        )
+
+        config = {
+            "trend": selection.candidate.trend,
+            "damped_trend": (
+                selection.candidate.damped_trend
+            ),
+            "seasonal": (
+                selection.candidate.seasonal
+            ),
+            "seasonal_periods": (
+                selection.candidate.seasonal_periods
+            ),
+            "aicc": float(
+                selection.aicc
+            ),
+        }
+
+    elif name == "theta":
+        fitted = FrozenTheta.fit(
+            training_series,
+            seasonal_period=m,
+        )
+
+        config = {
+            "theta": 2.0,
+            "seasonal_period": m,
+        }
+
+    elif name == "ridge_lag":
+        selection = select_ridge(
+            training_series,
+            n_lags=L,
+            seasonal_period=m,
+            alphas=[
+                1e-6,
+                1e-4,
+                1e-2,
+                0.1,
+                1.0,
+                10.0,
+                100.0,
+            ],
+        )
+
+        fitted = FrozenLagRegressor.fit_ridge(
+            training_series,
+            n_lags=L,
+            alpha=selection.alpha,
+        )
+
+        config = {
+            "n_lags": L,
+            "alpha": float(
+                selection.alpha
+            ),
+            "validation_mase": float(
+                selection.validation_mase
+            ),
+        }
+
+    elif name == "svr_rbf":
+        selection = select_svr(
+            training_series,
+            n_lags=L,
+            seasonal_period=m,
+            C_values=[
+                0.1,
+                1.0,
+                10.0,
+                100.0,
+            ],
+            epsilon_values=[
+                0.01,
+                0.05,
+                0.1,
+            ],
+            gamma_values=[
+                "scale",
+                0.1,
+                1.0,
+            ],
+        )
+
+        fitted = FrozenLagRegressor.fit_svr(
+            training_series,
+            n_lags=L,
+            C=selection.C,
+            epsilon=selection.epsilon,
+            gamma=selection.gamma,
+        )
+
+        config = {
+            "n_lags": L,
+            "C": float(
+                selection.C
+            ),
+            "epsilon": float(
+                selection.epsilon
+            ),
+            "gamma": selection.gamma,
+            "validation_mase": float(
+                selection.validation_mase
+            ),
+        }
+
+    elif name == "xgboost":
+        selection = select_xgboost(
+            training_series,
+            n_lags=L,
+            seasonal_period=m,
+            n_estimators_values=[
+                100,
+                300,
+            ],
+            max_depth_values=[
+                2,
+                3,
+            ],
+            learning_rate_values=[
+                0.03,
+                0.1,
+            ],
+            min_child_weight_values=[
+                1,
+                5,
+            ],
+        )
+
+        fitted = FrozenLagRegressor.fit_xgboost(
+            training_series,
+            n_lags=L,
+            n_estimators=(
+                selection.n_estimators
+            ),
+            max_depth=(
+                selection.max_depth
+            ),
+            learning_rate=(
+                selection.learning_rate
+            ),
+            min_child_weight=(
+                selection.min_child_weight
+            ),
+        )
+
+        config = {
+            "n_lags": L,
+            "n_estimators": int(
+                selection.n_estimators
+            ),
+            "max_depth": int(
+                selection.max_depth
+            ),
+            "learning_rate": float(
+                selection.learning_rate
+            ),
+            "min_child_weight": int(
+                selection.min_child_weight
+            ),
+            "validation_mase": float(
+                selection.validation_mase
+            ),
+        }
+
+    else:
+        raise ValueError(
+            f"unsupported V2 baseline: {name}"
+        )
+
+    return (
+        fitted,
+        config,
+        selection_failures,
+    )
+
+
+def run_baseline_v2(
+    training_series,
+    test_series,
+    model: str,
+    seasonal_period: int,
+) -> BaselineRunResult:
+    name = str(
+        model
+    ).strip().lower()
+
+    train = np.asarray(
+        training_series,
+        dtype=float,
+    ).reshape(-1)
+
+    test = np.asarray(
+        test_series,
+        dtype=float,
+    ).reshape(-1)
+
+    if train.size < 1:
+        raise ValueError(
+            "training_series must not be empty"
+        )
+
+    if test.size < 1:
+        raise ValueError(
+            "test_series must not be empty"
+        )
+
+    if not np.all(
+        np.isfinite(train)
+    ):
+        raise ValueError(
+            "training_series contains non-finite values"
+        )
+
+    if not np.all(
+        np.isfinite(test)
+    ):
+        raise ValueError(
+            "test_series contains non-finite values"
+        )
+
+    indices = np.arange(
+        train.size,
+        train.size + test.size,
+        dtype=int,
+    )
+
+    predictions = np.full(
+        test.size,
+        np.nan,
+        dtype=float,
+    )
+
+    selected_config = {}
+    selection_failures = []
+
+    preparation_stage = (
+        "selection"
+        if name in {
+            "sarima",
+            "ets",
+            "ridge_lag",
+            "svr_rbf",
+            "xgboost",
+        }
+        else "fit"
+    )
+    try:
+        (
+            fitted,
+            selected_config,
+            selection_failures,
+        ) = _prepare_baseline_v2(
+            train,
+            model=name,
+            seasonal_period=seasonal_period,
+        )
+
+    except Exception as exc:
+        if isinstance(
+            exc,
+            BaselineSelectionError,
+        ):
+            selection_failures = list(
+                exc.failures
+            )
+
+        result = BaselineRunResult(
+            model=name,
+            status="failed",
+            y_true=test.copy(),
+            y_pred=predictions,
+            test_indices=indices,
+            selected_config=selected_config,
+            selection_failures=selection_failures,
+            failure=BaselineRunFailure(
+                model=name,
+                stage=preparation_stage,
+                origin=None,
+                error_type=(
+                    type(exc).__name__
+                ),
+                message=str(exc),
+            ),
+            update_policy=V2_UPDATE_POLICY,
+            substitution_used=False,
+        )
+
+        assert_baseline_run_qc(
+            result
+        )
+
+        return result
+
+    failure = None
+
+    for i, actual in enumerate(test):
+        origin = int(
+            indices[i]
+        )
+
+        try:
+            prediction = float(
+                fitted.forecast_one()
+            )
+
+            if not np.isfinite(
+                prediction
+            ):
+                raise ValueError(
+                    "forecast is non-finite"
+                )
+
+            predictions[i] = prediction
+
+        except Exception as exc:
+            failure = BaselineRunFailure(
+                model=name,
+                stage="forecast",
+                origin=origin,
+                error_type=(
+                    type(exc).__name__
+                ),
+                message=str(exc),
+            )
+
+            break
+
+        try:
+            # Observed truth becomes available only
+            # after forecasting this origin.
+            fitted.observe(
+                float(actual)
+            )
+
+        except Exception as exc:
+            failure = BaselineRunFailure(
+                model=name,
+                stage="update",
+                origin=origin,
+                error_type=(
+                    type(exc).__name__
+                ),
+                message=str(exc),
+            )
+
+            break
+
+    status = (
+        "success"
+        if failure is None
+        else "failed"
+    )
+
+    result = BaselineRunResult(
+        model=name,
+        status=status,
+        y_true=test.copy(),
+        y_pred=predictions,
+        test_indices=indices,
+        selected_config=selected_config,
+        selection_failures=selection_failures,
+        failure=failure,
+        update_policy=V2_UPDATE_POLICY,
+        substitution_used=False,
+    )
+
+    assert_baseline_run_qc(
+        result
+    )
+
+    return result
+
+
+def baseline_run_qc_violations(
+    result: BaselineRunResult,
+) -> tuple[str, ...]:
+    violations = []
+
+    n_true = int(
+        np.asarray(
+            result.y_true
+        ).size
+    )
+
+    n_pred = int(
+        np.asarray(
+            result.y_pred
+        ).size
+    )
+
+    n_indices = int(
+        np.asarray(
+            result.test_indices
+        ).size
+    )
+
+    if not (
+        n_true
+        == n_pred
+        == n_indices
+    ):
+        violations.append(
+            "forecast length mismatch"
+        )
+
+    if result.status not in {
+        "success",
+        "failed",
+    }:
+        violations.append(
+            "invalid run status"
+        )
+
+    if (
+        result.update_policy
+        != V2_UPDATE_POLICY
+    ):
+        violations.append(
+            "invalid update policy provenance"
+        )
+
+    if result.substitution_used:
+        violations.append(
+            "forecast substitution is prohibited"
+        )
+
+    if (
+        result.failure is not None
+        and result.failure.stage not in {
+            "fit",
+            "selection",
+            "forecast",
+            "update",
+        }
+    ):
+        violations.append(
+            "invalid failure stage provenance"
+        )
+
+    if result.status == "success":
+        if result.failure is not None:
+            violations.append(
+                "successful run contains failure provenance"
+            )
+
+        if not np.all(
+            np.isfinite(
+                result.y_pred
+            )
+        ):
+            violations.append(
+                "successful run contains non-finite prediction"
+            )
+
+        if not result.selected_config:
+            violations.append(
+                "successful run lacks selected-config provenance"
+            )
+
+    if result.status == "failed":
+        if result.failure is None:
+            violations.append(
+                "failed run lacks failure provenance"
+            )
+
+    return tuple(
+        violations
+    )
+
+
+def assert_baseline_run_qc(
+    result: BaselineRunResult,
+) -> None:
+    violations = baseline_run_qc_violations(
+        result
+    )
+
+    if violations:
+        raise BaselineQCError(
+            "; ".join(
+                violations
+            )
+        )
+
+
+def accuracy_arrays(
+    result: BaselineRunResult,
+) -> tuple[np.ndarray, np.ndarray]:
+    assert_baseline_run_qc(
+        result
+    )
+
+    if not result.metrics_eligible:
+        raise BaselineQCError(
+            "baseline run is not eligible "
+            "for accuracy metrics"
+        )
+
+    return (
+        np.asarray(
+            result.y_true,
+            dtype=float,
+        ).copy(),
+        np.asarray(
+            result.y_pred,
+            dtype=float,
+        ).copy(),
+    )

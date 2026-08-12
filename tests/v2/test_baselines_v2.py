@@ -1388,3 +1388,492 @@ def test_ets_unsuccessful_optimizer_best_aicc_cannot_win(
     )
 
     assert "optimizer did not converge" in failures[0].message
+def test_frozen_drift_keeps_training_slope_fixed():
+    from nfpsosc.v2.baselines import FrozenDrift
+
+    y = np.asarray(
+        [10.0, 11.0, 13.0, 16.0],
+        dtype=float,
+    )
+
+    model = FrozenDrift.fit(y)
+
+    expected_slope = (
+        y[-1] - y[0]
+    ) / (len(y) - 1)
+
+    assert model.slope == pytest.approx(
+        expected_slope,
+        rel=0.0,
+        abs=0.0,
+    )
+
+    slope_before = model.slope
+
+    first = model.forecast_one()
+
+    model.observe(100.0)
+
+    second = model.forecast_one()
+
+    assert model.slope == slope_before
+
+    assert first == pytest.approx(
+        16.0 + expected_slope
+    )
+
+    assert second == pytest.approx(
+        100.0 + expected_slope
+    )
+
+
+def test_seasonal_naive_is_unavailable_when_m_equals_one():
+    from nfpsosc.v2.baselines import FrozenSeasonalNaive
+
+    y = np.arange(
+        20,
+        dtype=float,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="m>1",
+    ):
+        FrozenSeasonalNaive.fit(
+            y,
+            seasonal_period=1,
+        )
+
+
+def test_unified_runner_success_has_exact_finite_horizon():
+    from nfpsosc.v2.baselines import (
+        run_baseline_v2,
+        assert_baseline_run_qc,
+    )
+
+    train = np.arange(
+        30,
+        dtype=float,
+    )
+
+    test = np.asarray(
+        [30.0, 31.0, 32.0, 33.0],
+        dtype=float,
+    )
+
+    result = run_baseline_v2(
+        train,
+        test,
+        model="naive_1",
+        seasonal_period=1,
+    )
+
+    assert result.status == "success"
+    assert result.failure is None
+    assert result.metrics_eligible is True
+
+    assert len(result.y_pred) == len(test)
+    assert len(result.y_true) == len(test)
+    assert len(result.test_indices) == len(test)
+
+    assert np.all(
+        np.isfinite(result.y_pred)
+    )
+
+    assert result.substitution_used is False
+
+    assert_baseline_run_qc(result)
+
+
+def test_unified_runner_uses_observed_truth_not_predictions():
+    from nfpsosc.v2.baselines import run_baseline_v2
+
+    train = np.asarray(
+        [1.0, 2.0, 3.0],
+        dtype=float,
+    )
+
+    test = np.asarray(
+        [100.0, 200.0],
+        dtype=float,
+    )
+
+    result = run_baseline_v2(
+        train,
+        test,
+        model="naive_1",
+        seasonal_period=1,
+    )
+
+    # First origin sees training last value = 3.
+    # Second origin must see observed truth 100,
+    # not previous prediction 3.
+    np.testing.assert_array_equal(
+        result.y_pred,
+        np.asarray(
+            [3.0, 100.0],
+            dtype=float,
+        ),
+    )
+
+
+def test_theta_forecast_failure_is_not_replaced_by_naive(
+    monkeypatch,
+):
+    import nfpsosc.v2.baselines as baselines
+
+    train = np.arange(
+        1.0,
+        41.0,
+        dtype=float,
+    )
+
+    test = np.asarray(
+        [41.0, 42.0, 43.0],
+        dtype=float,
+    )
+
+    def forced_failure(self):
+        raise RuntimeError(
+            "forced Theta forecast failure"
+        )
+
+    monkeypatch.setattr(
+        baselines.FrozenTheta,
+        "forecast_one",
+        forced_failure,
+    )
+
+    result = baselines.run_baseline_v2(
+        train,
+        test,
+        model="theta",
+        seasonal_period=1,
+    )
+
+    assert result.status == "failed"
+    assert result.metrics_eligible is False
+    assert result.substitution_used is False
+
+    assert result.failure is not None
+    assert result.failure.stage == "forecast"
+    assert result.failure.error_type == "RuntimeError"
+
+    assert "forced Theta forecast failure" in (
+        result.failure.message
+    )
+
+    # No naive or other replacement is permitted.
+    assert np.all(
+        np.isnan(result.y_pred)
+    )
+
+
+def test_selection_failure_produces_no_fake_predictions(
+    monkeypatch,
+):
+    import nfpsosc.v2.baselines as baselines
+
+    train = np.arange(
+        1.0,
+        61.0,
+        dtype=float,
+    )
+
+    test = np.asarray(
+        [61.0, 62.0],
+        dtype=float,
+    )
+
+    candidate = baselines.SARIMACandidate(
+        order=(0, 0, 0),
+        seasonal_order=(0, 0, 0, 0),
+        trend=None,
+    )
+
+    failures = [
+        baselines.CandidateFailure(
+            model="sarima",
+            candidate=candidate,
+            error_type="RuntimeError",
+            message="forced selection failure",
+        )
+    ]
+
+    def forced_selection_failure(*args, **kwargs):
+        raise baselines.BaselineSelectionError(
+            "SARIMA",
+            failures,
+        )
+
+    monkeypatch.setattr(
+        baselines,
+        "select_sarima_aicc",
+        forced_selection_failure,
+    )
+
+    result = baselines.run_baseline_v2(
+        train,
+        test,
+        model="sarima",
+        seasonal_period=1,
+    )
+
+    assert result.status == "failed"
+    assert result.failure is not None
+    assert result.failure.stage == "selection"
+
+    assert len(
+        result.selection_failures
+    ) == 1
+
+    assert np.all(
+        np.isnan(result.y_pred)
+    )
+
+    assert result.metrics_eligible is False
+
+
+def test_failed_run_cannot_supply_accuracy_arrays(
+    monkeypatch,
+):
+    import nfpsosc.v2.baselines as baselines
+
+    train = np.arange(
+        1.0,
+        41.0,
+        dtype=float,
+    )
+
+    test = np.asarray(
+        [41.0, 42.0],
+        dtype=float,
+    )
+
+    def forced_failure(self):
+        raise RuntimeError("forced failure")
+
+    monkeypatch.setattr(
+        baselines.FrozenTheta,
+        "forecast_one",
+        forced_failure,
+    )
+
+    result = baselines.run_baseline_v2(
+        train,
+        test,
+        model="theta",
+        seasonal_period=1,
+    )
+
+    with pytest.raises(
+        baselines.BaselineQCError,
+        match="not eligible",
+    ):
+        baselines.accuracy_arrays(
+            result
+        )
+
+
+def test_qc_rejects_substitution_flag():
+    from nfpsosc.v2.baselines import (
+        BaselineRunResult,
+        BaselineQCError,
+        assert_baseline_run_qc,
+    )
+
+    result = BaselineRunResult(
+        model="theta",
+        status="success",
+        y_true=np.asarray(
+            [1.0, 2.0]
+        ),
+        y_pred=np.asarray(
+            [1.0, 2.0]
+        ),
+        test_indices=np.asarray(
+            [10, 11]
+        ),
+        selected_config={
+            "theta": 2.0,
+        },
+        selection_failures=[],
+        failure=None,
+        update_policy=(
+            "fixed_model_parameters_with_observed_history"
+        ),
+        substitution_used=True,
+    )
+
+    with pytest.raises(
+        BaselineQCError,
+        match="substitution",
+    ):
+        assert_baseline_run_qc(
+            result
+        )
+
+
+def test_qc_rejects_success_with_nonfinite_prediction():
+    from nfpsosc.v2.baselines import (
+        BaselineRunResult,
+        BaselineQCError,
+        assert_baseline_run_qc,
+    )
+
+    result = BaselineRunResult(
+        model="theta",
+        status="success",
+        y_true=np.asarray(
+            [1.0, 2.0]
+        ),
+        y_pred=np.asarray(
+            [1.0, np.nan]
+        ),
+        test_indices=np.asarray(
+            [10, 11]
+        ),
+        selected_config={
+            "theta": 2.0,
+        },
+        selection_failures=[],
+        failure=None,
+        update_policy=(
+            "fixed_model_parameters_with_observed_history"
+        ),
+        substitution_used=False,
+    )
+
+    with pytest.raises(
+        BaselineQCError,
+        match="non-finite",
+    ):
+        assert_baseline_run_qc(
+            result
+        )
+
+
+def test_qc_rejects_forecast_length_mismatch():
+    from nfpsosc.v2.baselines import (
+        BaselineRunResult,
+        BaselineQCError,
+        assert_baseline_run_qc,
+    )
+
+    result = BaselineRunResult(
+        model="naive_1",
+        status="success",
+        y_true=np.asarray(
+            [1.0, 2.0]
+        ),
+        y_pred=np.asarray(
+            [1.0]
+        ),
+        test_indices=np.asarray(
+            [10, 11]
+        ),
+        selected_config={
+            "tuning": "none",
+        },
+        selection_failures=[],
+        failure=None,
+        update_policy=(
+            "fixed_model_parameters_with_observed_history"
+        ),
+        substitution_used=False,
+    )
+
+    with pytest.raises(
+        BaselineQCError,
+        match="length",
+    ):
+        assert_baseline_run_qc(
+            result
+        )
+def test_theta_fit_failure_is_recorded_as_fit(
+    monkeypatch,
+):
+    import nfpsosc.v2.baselines as baselines
+
+    train = np.arange(
+        1.0,
+        41.0,
+        dtype=float,
+    )
+
+    test = np.asarray(
+        [41.0, 42.0],
+        dtype=float,
+    )
+
+    def forced_fit_failure(*args, **kwargs):
+        raise RuntimeError(
+            "forced Theta fit failure"
+        )
+
+    monkeypatch.setattr(
+        baselines.FrozenTheta,
+        "fit",
+        forced_fit_failure,
+    )
+
+    result = baselines.run_baseline_v2(
+        train,
+        test,
+        model="theta",
+        seasonal_period=1,
+    )
+
+    assert result.status == "failed"
+    assert result.failure is not None
+    assert result.failure.stage == "fit"
+    assert result.failure.origin is None
+
+
+def test_observe_failure_is_recorded_as_update(
+    monkeypatch,
+):
+    import nfpsosc.v2.baselines as baselines
+
+    train = np.asarray(
+        [1.0, 2.0, 3.0],
+        dtype=float,
+    )
+
+    test = np.asarray(
+        [4.0, 5.0],
+        dtype=float,
+    )
+
+    def forced_update_failure(
+        self,
+        observed_value,
+    ):
+        raise RuntimeError(
+            "forced observed-state update failure"
+        )
+
+    monkeypatch.setattr(
+        baselines.FrozenNaive1,
+        "observe",
+        forced_update_failure,
+    )
+
+    result = baselines.run_baseline_v2(
+        train,
+        test,
+        model="naive_1",
+        seasonal_period=1,
+    )
+
+    assert result.status == "failed"
+    assert result.failure is not None
+    assert result.failure.stage == "update"
+    assert result.failure.origin == len(train)
+    assert result.y_pred[0] == pytest.approx(
+        train[-1]
+    )
+    assert np.isnan(
+        result.y_pred[1]
+    )
+    assert result.metrics_eligible is False
