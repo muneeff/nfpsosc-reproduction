@@ -1,0 +1,15 @@
+{
+  "amendment_id": "V2-A003",
+  "status": "LOCKED_BEFORE_DEVELOPMENT",
+  "scope": "Define ETS candidate validity with respect to numerical optimization convergence. No candidate grid, AICc criterion, tie-break, test-time update policy, or final-set rule is changed.",
+  "parent_amendment_commit": "fe413712bb2ca2f85b409f1b21f2a5b5873d99cd",
+  "ets_candidate_validity": [
+    "fit completes without exception",
+    "all fitted parameters are finite",
+    "AICc is finite",
+    "mle_retvals exists for optimized candidate fitting",
+    "mle_retvals.success is exactly True"
+  ],
+  "invalid_candidate_policy": "Treat as candidate failure; log reason; exclude from AICc competition; never substitute or fallback.",
+  "justification": "An optimized ETS candidate whose numerical optimizer reports failure is not accepted into AICc model selection even when a finite AICc is returned. This rule is frozen before any V2 development or final benchmark."
+}
