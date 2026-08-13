@@ -1,0 +1,61 @@
+{
+  "amendment_id": "V2-A008",
+  "status": "LOCKED_BEFORE_DEVELOPMENT",
+  "title": "Henon-map basin-valid initial-condition rejection rule",
+  "parent_protocol_commit": "d1c2d24ab3f8677be409a9b9a6ca139a32310ac8",
+  "parent_code_commit": "d3cc70b869afcfb43f00fc5d27ca1e8805204a4d",
+  "trigger": "A pre-outcome numerical-feasibility audit found that the frozen Henon-map initial-condition rule can draw states outside the basin of a finite 180-sample trajectory after the frozen 1000-step burn-in. Development seeds 1001-1010 all passed; final seed 2003 failed before any model fitting or performance metric was computed.",
+  "scope": "Henon-map initial-condition generation only",
+  "unchanged_parameters": {
+    "a": 1.4,
+    "b": 0.3,
+    "initial_condition_distribution": "x0,y0 independently Uniform(-0.5,0.5)",
+    "rng": "numpy.random.default_rng(dgp_seed)",
+    "burn_in_updates": 1000,
+    "returned_length": 180,
+    "post_burn_stride": 1,
+    "observed_variable": "x",
+    "relative_noise_seed_offset": 8000,
+    "relative_noise_minimum_scale": 1.0
+  },
+  "rejection_rule": {
+    "draw_order": "Draw candidate pairs sequentially from one numpy.random.default_rng(dgp_seed): x_candidate first, then y_candidate.",
+    "candidate_feasibility_horizon_updates": 1179,
+    "derivation": "1000 burn-in updates + 179 updates between the 180 returned samples",
+    "escape_guard": 1000000.0,
+    "candidate_is_accepted_if": "For the complete 1179-update feasibility horizon, both state components remain finite and abs(x)<=1e6 and abs(y)<=1e6 at every checked state.",
+    "candidate_is_rejected_if": "Either component is non-finite or exceeds the escape guard in absolute value.",
+    "on_rejection": "Draw the next x,y pair from the same RNG and test again.",
+    "maximum_candidate_pairs": 10000,
+    "exhaustion_behavior": "Fatal RuntimeError; no fallback trajectory and no seed substitution.",
+    "generation_after_acceptance": "Restart the Henon recurrence from the accepted candidate and generate the frozen 1000-step burn-in followed by 180 x observations exactly as before."
+  },
+  "seed_audit_before_amendment": {
+    "debug_seed_1": {
+      "old_status": "invalid/non-finite",
+      "accepted_candidate_number_under_A008": 3,
+      "accepted_initial_condition": [
+        -0.18816854798951455,
+        -0.07667355102742435
+      ]
+    },
+    "development_seeds_1001_1010": {
+      "checked": 10,
+      "failed_under_old_rule": 0,
+      "effect_of_A008": "none; first candidate remains accepted for all 10 seeds"
+    },
+    "final_seeds_2001_2020": {
+      "checked": 20,
+      "failed_under_old_rule": [
+        2003
+      ],
+      "seed_2003_accepted_candidate_number_under_A008": 3,
+      "seed_2003_accepted_initial_condition": [
+        0.48212728096900015,
+        -0.3580221771573131
+      ]
+    }
+  },
+  "performance_blindness": "The amendment was triggered and specified using DGP numerical feasibility only. No PC-NFPSO or baseline model was fitted for the audit, no forecast metric was computed, and no development/final performance outcome was inspected.",
+  "workspace_consequence": "The existing development workspace freeze bound to the pre-A008 protocol fingerprint must be retained as historical provenance but must not be used for execution. After A008 and its implementation are committed and tested, a new development workspace must be created with a new protocol fingerprint and manifest binding."
+}
