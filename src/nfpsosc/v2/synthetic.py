@@ -219,22 +219,70 @@ def _logistic_map_clean(dgp_seed: int) -> np.ndarray:
     return out
 
 
+_HENON_BURN_IN_UPDATES = 1000
+_HENON_FEASIBILITY_UPDATES = _HENON_BURN_IN_UPDATES + (SERIES_LENGTH - 1)
+_HENON_ESCAPE_GUARD = 1_000_000.0
+_HENON_MAX_CANDIDATE_PAIRS = 10_000
+
+
+def _henon_update(
+    x_old: np.float64,
+    y_old: np.float64,
+) -> tuple[np.float64, np.float64]:
+    # Preserve the source-level arithmetic order used by the frozen V2 generator.
+    x_new = np.float64(1.0 - 1.4 * x_old * x_old + y_old)
+    y_new = np.float64(0.3 * x_old)
+    return x_new, y_new
+
+
+def _henon_candidate_is_feasible(
+    x_initial: np.float64,
+    y_initial: np.float64,
+) -> bool:
+    x = np.float64(x_initial)
+    y = np.float64(y_initial)
+    for _ in range(_HENON_FEASIBILITY_UPDATES):
+        # Rejected candidates may escape explosively; suppress the expected floating-
+        # point warnings and make the rejection decision from the explicit guard.
+        with np.errstate(over="ignore", invalid="ignore"):
+            x, y = _henon_update(x, y)
+        if not (np.isfinite(x) and np.isfinite(y)):
+            return False
+        if abs(float(x)) > _HENON_ESCAPE_GUARD or abs(float(y)) > _HENON_ESCAPE_GUARD:
+            return False
+    return True
+
+
+def henon_initial_condition(dgp_seed: int) -> tuple[float, float, int]:
+    """Return the first A008 basin-valid Hénon initial-condition pair.
+
+    Candidate pairs are drawn sequentially from one ``default_rng(dgp_seed)``.
+    The third returned value is the one-based accepted candidate number.
+    """
+    seed = _validate_seed(dgp_seed)
+    rng = np.random.default_rng(seed)
+    for candidate_number in range(1, _HENON_MAX_CANDIDATE_PAIRS + 1):
+        x = np.float64(rng.uniform(-0.5, 0.5))
+        y = np.float64(rng.uniform(-0.5, 0.5))
+        if _henon_candidate_is_feasible(x, y):
+            return float(x), float(y), candidate_number
+    raise RuntimeError(
+        "No basin-valid Hénon initial condition found within "
+        f"{_HENON_MAX_CANDIDATE_PAIRS} candidate pairs for dgp_seed={seed}."
+    )
+
+
 def _henon_map_clean(dgp_seed: int) -> np.ndarray:
-    rng = np.random.default_rng(dgp_seed)
-    x = np.float64(rng.uniform(-0.5, 0.5))
-    y = np.float64(rng.uniform(-0.5, 0.5))
+    x0, y0, _ = henon_initial_condition(dgp_seed)
+    x = np.float64(x0)
+    y = np.float64(y0)
 
-    def update(x_old: np.float64, y_old: np.float64) -> tuple[np.float64, np.float64]:
-        x_new = np.float64(1.0 - 1.4 * x_old * x_old + y_old)
-        y_new = np.float64(0.3 * x_old)
-        return x_new, y_new
-
-    for _ in range(1000):
-        x, y = update(x, y)
+    for _ in range(_HENON_BURN_IN_UPDATES):
+        x, y = _henon_update(x, y)
     out = np.empty(SERIES_LENGTH, dtype=np.float64)
     out[0] = x
     for i in range(1, SERIES_LENGTH):
-        x, y = update(x, y)
+        x, y = _henon_update(x, y)
         out[i] = x
     return out
 
@@ -385,6 +433,7 @@ __all__ = [
     "list_generators",
     "seasonal_period",
     "apply_relative_observation_noise",
+    "henon_initial_condition",
     "generate_clean_series",
     "generate_synthetic_series",
     "generate_noise_bundle",

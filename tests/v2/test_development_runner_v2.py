@@ -150,6 +150,15 @@ def test_mase_rejects_degenerate_scale() -> None:
         dr.raw_mase_scale(np.ones(144), seasonal_period_value=1)
 
 
+
+
+def test_protocol_inputs_include_a008_henon_amendment() -> None:
+    assert dr.PROTOCOL_INPUT_FILES[-1] == (
+        "configs/v2/amendment_008_henon_basin_rejection.json"
+    )
+    assert len(set(dr.PROTOCOL_INPUT_FILES)) == len(dr.PROTOCOL_INPUT_FILES)
+
+
 def test_protocol_fingerprint_is_deterministic_and_content_sensitive(tmp_path: Path) -> None:
     _write_protocol_fixture(tmp_path)
     a = dr.protocol_fingerprint(tmp_path)

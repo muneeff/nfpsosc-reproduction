@@ -47,6 +47,7 @@ PROTOCOL_INPUT_FILES: tuple[str, ...] = (
     "configs/v2/amendment_005_canonical_synthetic.json",
     "configs/v2/amendment_006_lorenz_rk4_order.json",
     "configs/v2/amendment_007_pcnfpso_validation_failure.json",
+    "configs/v2/amendment_008_henon_basin_rejection.json",
 )
 
 

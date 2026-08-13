@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+
 import numpy as np
 import pytest
 
@@ -13,6 +15,7 @@ from nfpsosc.v2.synthetic import (
     generate_clean_series,
     generate_noise_bundle,
     generate_synthetic_series,
+    henon_initial_condition,
     list_generators,
     seasonal_period,
 )
@@ -172,3 +175,65 @@ def test_returned_arrays_are_read_only() -> None:
     s = generate_synthetic_series("linear_ar", dgp_seed=1001, noise_level=0.10)
     assert not s.clean.flags.writeable
     assert not s.observed.flags.writeable
+
+
+_HENON_DEVELOPMENT_PRE_A008_SHA256 = {
+    1001: "b7754e49ca0a7b4fcb6f73121d483f37dcc512ce8c739bdc4bcfe70601322428",
+    1002: "29b73b7fc94cf35911a4c3d958fb0850ee064b89dbdfd0c62f748e5894666af0",
+    1003: "1fb7906cf9e40136eacec533b3d67ddae6bd25cf3917f2f7a721ee3f04968d1a",
+    1004: "b3cab392ef06b4146a52d384fb5d12c75fccd21e71afc8bdf3435bf459b57636",
+    1005: "c876869e934968f95ef2dcf5badb5061c85bd86c36c2b5e1278458daf91d6d7f",
+    1006: "82114bf4f48956cac1de5529e399813df3f719698795e0df4ff3f2f0a94877f2",
+    1007: "e6ca0a85545c7510549f500f03b110b9be6d43f3d78dadc9ce2a7c8ee868cce8",
+    1008: "4e568da35fd82f5d46cf80ba328bf8a8d39c854c8ccdaf24bc5cf67227c73a53",
+    1009: "c27b50f5a4cf7052bd7141fd3644e78c9a5cead0cb0d96857b5af291a80e04c6",
+    1010: "46ce0ba93ec4dfd4961b465d73763f61c6d6b745f64f3da6eb93db05d539ed39",
+}
+
+
+@pytest.mark.parametrize(
+    "dgp_seed,expected_sha256",
+    sorted(_HENON_DEVELOPMENT_PRE_A008_SHA256.items()),
+)
+def test_a008_preserves_all_henon_development_trajectories_bit_for_bit(
+    dgp_seed: int, expected_sha256: str
+) -> None:
+    x0, y0, candidate_number = henon_initial_condition(dgp_seed)
+    assert candidate_number == 1
+    assert -0.5 <= x0 <= 0.5
+    assert -0.5 <= y0 <= 0.5
+    y = generate_clean_series("henon_map", dgp_seed=dgp_seed)
+    payload = np.asarray(y, dtype="<f8").tobytes(order="C")
+    assert hashlib.sha256(payload).hexdigest() == expected_sha256
+
+
+def test_a008_debug_seed_1_accepts_candidate_three_exactly() -> None:
+    x0, y0, candidate_number = henon_initial_condition(1)
+    assert candidate_number == 3
+    assert x0 == pytest.approx(-0.18816854798951455, rel=0.0, abs=0.0)
+    assert y0 == pytest.approx(-0.07667355102742435, rel=0.0, abs=0.0)
+    y = generate_clean_series("henon_map", dgp_seed=1)
+    assert y.shape == (SERIES_LENGTH,)
+    assert np.all(np.isfinite(y))
+
+
+def test_a008_final_seed_2003_accepts_candidate_three_exactly() -> None:
+    x0, y0, candidate_number = henon_initial_condition(2003)
+    assert candidate_number == 3
+    assert x0 == pytest.approx(0.48212728096900015, rel=0.0, abs=0.0)
+    assert y0 == pytest.approx(-0.3580221771573131, rel=0.0, abs=0.0)
+    y = generate_clean_series("henon_map", dgp_seed=2003)
+    assert y.shape == (SERIES_LENGTH,)
+    assert np.all(np.isfinite(y))
+
+
+def test_a008_all_frozen_dgp_seed_domains_are_finite_length_180() -> None:
+    seed_domains = (1,) + tuple(range(1001, 1011)) + tuple(range(2001, 2021))
+    checked = 0
+    for generator in ALL_GENERATORS:
+        for dgp_seed in seed_domains:
+            y = generate_clean_series(generator, dgp_seed=dgp_seed)
+            assert y.shape == (SERIES_LENGTH,)
+            assert np.all(np.isfinite(y))
+            checked += 1
+    assert checked == 279
