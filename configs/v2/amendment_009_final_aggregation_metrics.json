@@ -1,0 +1,91 @@
+{
+  "amendment_id": "V2-A009",
+  "baseline_final_aggregation": {
+    "optimizer_replicates": false,
+    "real": "one baseline forecast run per frozen final real series",
+    "seasonal_naive": "create comparison rows only when frozen seasonal period m > 1",
+    "synthetic": "one baseline forecast run per process x DGP-seed x noise condition; compute metrics for that condition, then arithmetic mean across the three confirmatory noise levels to obtain one process x DGP-seed analysis unit"
+  },
+  "date": "2026-08-14",
+  "failure_and_estimability": {
+    "failure_reporting": "Failures and failure rates are reported separately by model/domain and are never replaced, imputed, or silently substituted.",
+    "pairwise_accuracy": "A paired accuracy comparison is formed only when both PC-NFPSO and the comparator have estimable values for the same frozen analysis unit.",
+    "pc_nfpso_optimizer_replicate_requirement": "All five required optimizer replicates must succeed with finite predictions and finite metric values for the PC-NFPSO metric of a synthetic condition or real series to be estimable. Do not compute a median from a surviving subset.",
+    "real_baseline_requirement": "The baseline run must succeed for that real series.",
+    "synthetic_baseline_block_requirement": "All three confirmatory noise-condition baseline values must be estimable before forming that baseline's process x DGP-seed analysis-unit value.",
+    "synthetic_pc_block_requirement": "All three confirmatory noise-condition PC-NFPSO aggregates must be estimable before forming the process x DGP-seed analysis-unit value."
+  },
+  "locked_interpretation": {
+    "metric_aggregation_not_prediction_aggregation": true,
+    "noise_variants_are_independent_analysis_units": false,
+    "optimizer_replicates_are_independent_analysis_units": false,
+    "real_series_are_analysis_units": true,
+    "synthetic_process_seed_blocks_are_analysis_units": true
+  },
+  "metric_formulas": {
+    "MAE": {
+      "formula": "mean(abs(y-yhat))"
+    },
+    "MASE": {
+      "formula": "mean(abs(y-yhat)) / mean_train(abs(y[t]-y[t-m]))",
+      "minimum_denominator": 1e-12,
+      "scale_window": "pre-test training only"
+    },
+    "RMSE": {
+      "formula": "sqrt(mean((y-yhat)^2))"
+    },
+    "RMSSE": {
+      "formula": "sqrt(mean_test((y-yhat)^2) / mean_train((y[t]-y[t-m])^2))",
+      "minimum_squared_scale": 1e-24,
+      "scale_window": "pre-test training only"
+    },
+    "sMAPE": {
+      "formula": "200 * mean(abs(y-yhat) / (abs(y)+abs(yhat)))",
+      "units": "percent",
+      "zero_denominator_term": 0.0
+    }
+  },
+  "pc_nfpso_final_optimizer_replicates": {
+    "real": {
+      "analysis_unit": "one frozen final real series",
+      "metric_aggregation_within_series": "median across the five optimizer-replicate metric values",
+      "optimizer_seeds": [
+        41001,
+        41002,
+        41003,
+        41004,
+        41005
+      ],
+      "prediction_aggregation": false
+    },
+    "synthetic": {
+      "analysis_unit": "process x DGP seed",
+      "metric_aggregation_within_process_seed_noise_condition": "median across the five optimizer-replicate metric values",
+      "optimizer_seeds": [
+        41001,
+        41002,
+        41003,
+        41004,
+        41005
+      ],
+      "prediction_aggregation": false,
+      "then_noise_aggregation": "arithmetic mean across noise levels 0.05, 0.10, 0.20"
+    }
+  },
+  "protocol_version": "2.0",
+  "scope": {
+    "changes_baseline_configuration": false,
+    "changes_final_series_ids": false,
+    "changes_final_synthetic_seeds": false,
+    "changes_hyperparameter_selection": false,
+    "changes_selected_radius_or_alpha": false,
+    "role": "performance-blind implementation clarification before any final forecast is generated"
+  },
+  "status": "LOCKED_PRE_FINAL_PERFORMANCE",
+  "title": "Final stochastic aggregation and secondary-metric operationalization",
+  "trigger": {
+    "final_performance_outcomes_generated": false,
+    "reason": "The frozen protocol specifies five final optimizer seeds and defines the real confirmatory analysis unit as one series, but does not explicitly state how stochastic PC-NFPSO replicates are reduced to one real-series metric. It also names sMAPE and RMSSE without fully operationalizing their numerical formulas.",
+    "stage": "3F-1B post-development, pre-final benchmark"
+  }
+}
