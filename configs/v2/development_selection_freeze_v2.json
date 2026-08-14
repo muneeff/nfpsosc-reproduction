@@ -1,0 +1,37 @@
+{
+  "created_date": "2026-08-14",
+  "development_manifest_sha256": "0e9c8125228aaa3aaeee23d173c59d0c97bdf24ab71488a79aa8320b150a4f64",
+  "development_results": {
+    "aggregate_sha256": "8ff2e5d3d3861cec5d7d608610447b16f7905f8ecabfa74a90e057301c70246e",
+    "condition_count": 270,
+    "failed_count": 0,
+    "generator_count": 9,
+    "hash_manifest_sha256": "5c89a8fbbd8eb2957a9a82b47d44c51e1974308b76b8b125b99f85ad6cae4e9d",
+    "record_count": 28350,
+    "selection_result_sha256": "f39ab0284b5058a8a7814006898b09ece39518ac1afb834fce590d88957675d6",
+    "successful_count": 28350
+  },
+  "lock_rule": "The selected radius and ridge alpha are fixed for all subsequent final benchmark runs and must not be changed in response to final benchmark outcomes.",
+  "protocol_fingerprint": "0b60efbdf693a7f2053c426806e6d44d5b146e53afb7615ca28398202478889e",
+  "schema_version": "v2-development-selection-freeze-1",
+  "selected_hyperparameters": {
+    "radius": 1.0,
+    "ridge_alpha": 0.05
+  },
+  "selection_rule": {
+    "aggregation": [
+      "median MASE across optimizer replicates within each development condition and candidate pair",
+      "global median across all development conditions for each candidate pair"
+    ],
+    "candidate_grid_size": 35,
+    "final_domain_used_for_selection": false,
+    "optimizer_replicates_per_condition": 3,
+    "real_final_domain_used_for_selection": false,
+    "tie_break": [
+      "larger radius",
+      "larger alpha"
+    ]
+  },
+  "source_code_commit": "db4b18e74ae7c443fe7cbf837ba8664e63d21dca",
+  "status": "LOCKED_AFTER_COMPLETE_DEVELOPMENT_BEFORE_FINAL_BENCHMARK"
+}
