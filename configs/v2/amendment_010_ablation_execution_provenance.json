@@ -1,0 +1,132 @@
+{
+  "amendment_id": "V2-A010",
+  "failure_and_estimability": {
+    "fixed_family_label_retention": "all seven pre-specified reference-contrast labels remain in the Holm family; if a contrast has no estimable paired units, assign raw p=1.0 for multiplicity accounting rather than deleting the hypothesis",
+    "no_imputation": true,
+    "no_silent_fallback": true,
+    "no_survivor_median_for_stochastic_variant": true,
+    "pairwise_inference": "use only frozen process x DGP-seed analysis units for which both members of that contrast are estimable; report pair count and all execution failures separately",
+    "stochastic_condition_requirement": "all three planned optimizer replicates must succeed before the within-condition median is defined",
+    "synthetic_analysis_unit_requirement": "all three confirmatory noise aggregates must be defined for both PC_NFPSO and the contrasted variant"
+  },
+  "implementation_firewall": {
+    "ablation_execution_workspace_must_be_frozen_before_first_new_ablation_outcome": true,
+    "ablation_manifest_must_be_frozen_before_first_new_ablation_outcome": true,
+    "external_final_results_may_change_inferential_family": false,
+    "external_final_results_may_change_seeds_or_noise_levels": false,
+    "external_final_results_may_redefine_variants": false,
+    "external_final_results_may_retune_radius_or_alpha": false
+  },
+  "inferential_scope": {
+    "confirmatory_synthetic_reference_contrasts": [
+      "NF_BASE",
+      "NFPSO",
+      "P_NFPSO",
+      "C_NFPSO",
+      "PC_NO_SENSITIVITY",
+      "PC_NO_COVERAGE",
+      "PC_VALIDATION_ONLY"
+    ],
+    "family_size": 7,
+    "other_factorial_component_contrasts": "descriptive component-attribution contrasts unless separately pre-specified for formal inference; they are not added to the seven-reference-contrast Holm family",
+    "real_anchor": {
+      "contrast": "PC_NFPSO vs NF_BASE",
+      "formal_holm_test_added": false,
+      "role": "external-domain descriptive anchor only; it is not part of the seven-hypothesis synthetic confirmatory ablation family"
+    }
+  },
+  "new_execution_task_ledger": {
+    "external_pc_reference_rows_reused_total": 1410,
+    "grand_new_tasks_total": 5250,
+    "real_new_tasks_total": 120,
+    "real_nf_base_new_tasks": 120,
+    "real_pc_reference_rows_reused": 600,
+    "synthetic_conditions": 270,
+    "synthetic_new_tasks_total": 5130,
+    "synthetic_nf_base_new_tasks": 270,
+    "synthetic_nonreference_stochastic_new_tasks": 4860,
+    "synthetic_nonreference_stochastic_variant_count": 6,
+    "synthetic_pc_reference_rows_reused": 810
+  },
+  "nf_base_execution": {
+    "antecedents": "subtractive-clustering initialization using the frozen selected radius=1.0 on the same fitting data/scaling pipeline as PC_NFPSO",
+    "consequents": "ridge alpha=0.05; final consequent-only refit on the complete pre-test supervised window with antecedents fixed",
+    "optimizer_seed": null,
+    "replicates_per_condition_or_series": 1,
+    "stochastic": false,
+    "test_update_policy": "fixed fitted parameters; observed true history updates raw lag inputs between one-step test origins; no parameter re-estimation"
+  },
+  "protocol_version": "2.0",
+  "reference_result_reuse": {
+    "external_final_results_aggregate_sha256": "393b7df1fca6d6dc2e57b60b06d6ccca7f15217e3a8c351b9427346829da299b",
+    "principle": "Do not rerun a scientifically identical PC_NFPSO task when the exact task already exists in the cryptographically closed external Final corpus. Reuse is by exact frozen task identity and immutable result bytes, not by refitting, retuning, or selecting outcomes.",
+    "real": {
+      "aggregation": "reuse the A009-locked median MASE across all five optimizer replicates for each frozen real series",
+      "reference_variant": "PC_NFPSO",
+      "reuse_optimizer_seeds": [
+        41001,
+        41002,
+        41003,
+        41004,
+        41005
+      ],
+      "reused_raw_result_rows": 600,
+      "series": 120
+    },
+    "synthetic": {
+      "aggregation": "median MASE across optimizer seeds 41001-41003 within each process x DGP-seed x noise condition, then arithmetic mean across noise 0.05, 0.10, 0.20",
+      "reference_variant": "PC_NFPSO",
+      "reuse_dgp_seeds": "2001-2010 inclusive",
+      "reuse_noise_levels": [
+        0.05,
+        0.1,
+        0.2
+      ],
+      "reuse_optimizer_seeds": [
+        41001,
+        41002,
+        41003
+      ],
+      "reused_raw_result_rows": 810
+    }
+  },
+  "scientific_contract_unchanged": {
+    "familywise_alpha": 0.05,
+    "multiplicity": "Holm across the fixed seven PC_NFPSO reference contrasts",
+    "primary_ci": "95 percent exact nonparametric order-statistic CI",
+    "primary_difference": "MASE_PC_NFPSO - MASE_variant",
+    "primary_effect": "sample median paired MASE difference",
+    "primary_metric": "MASE",
+    "primary_test": "exact two-sided paired sign test",
+    "selected_radius": 1.0,
+    "selected_ridge_alpha": 0.05,
+    "synthetic_dgp_seeds": "2001-2010 inclusive",
+    "synthetic_noise_levels": [
+      0.05,
+      0.1,
+      0.2
+    ],
+    "synthetic_optimizer_seeds": [
+      41001,
+      41002,
+      41003
+    ],
+    "synthetic_primary_analysis_units": 90,
+    "synthetic_processes": "all nine frozen process families"
+  },
+  "status": "LOCKED_PRE_ABLATION_OUTCOMES",
+  "synthetic_variant_aggregation": {
+    "NF_BASE": "one deterministic MASE per process x DGP-seed x noise, then arithmetic mean across the three confirmatory noise levels",
+    "PC_NFPSO": "same three-seed median then three-noise arithmetic mean, using exact reused external reference rows",
+    "all_stochastic_nonreference_variants": "median MASE across exactly optimizer seeds 41001-41003 within each process x DGP-seed x noise, then arithmetic mean across the three confirmatory noise levels"
+  },
+  "timing": {
+    "ablation_inferential_family_changed": false,
+    "ablation_outcomes_generated_before_this_clarification": false,
+    "ablation_variant_definitions_changed": false,
+    "external_closure_commit": "ed1e713a869a0c0b62d098f6f15c664b1472f63e",
+    "external_closure_tag": "v2-final-external-analysis-closure-2026-08-14",
+    "external_final_outcomes_already_closed": true
+  },
+  "title": "Ablation execution and reference-provenance clarification"
+}
