@@ -1,0 +1,129 @@
+{
+  "analysis_units": {
+    "real": 120,
+    "seasonal_naive_real_support": 80,
+    "seasonal_naive_synthetic_support": 40,
+    "synthetic": 180
+  },
+  "artifact": "V2_FINAL_EXTERNAL_ANALYSIS_CLOSURE",
+  "date": "2026-08-14",
+  "execution": {
+    "canonical_completed_workspace": "C:\\Users\\ADMIN\\nfpsosc_v2_final_recovery_20260814",
+    "canonical_counts": {
+      "completed": 8780,
+      "failed": 0,
+      "pending": 0,
+      "successful": 8780
+    },
+    "memory_incident_interpretation": "Four M4/Monthly/M16885 PC-NFPSO tasks failed during data loading with host MemoryError under four-worker execution, before model fitting. The exact frozen tasks later succeeded under one-worker recovery with no scientific code/data/seed/hyperparameter changes. This strongly supports concurrent memory pressure as the operational cause; the original failed checkpoints remain immutable evidence.",
+    "original_incident_counts": {
+      "completed": 8508,
+      "failed": 4,
+      "pending": 272,
+      "successful": 8504
+    },
+    "original_incident_evidence_workspace": "outputs\\v2\\final_external",
+    "real_tasks": 1640,
+    "synthetic_tasks": 7140
+  },
+  "primary_mase": {
+    "difference": "MASE_PC-NFPSO - MASE_baseline",
+    "median_ci": "exact 95% nonparametric order-statistic CI",
+    "multiplicity": "Holm across the fixed full family of 18 hypotheses",
+    "negative_favors": "PC-NFPSO",
+    "non_significance_interpretation": "not equivalence",
+    "real": {
+      "comparator_superior": [
+        "naive_1",
+        "drift",
+        "sarima",
+        "ets",
+        "theta",
+        "ridge_lag"
+      ],
+      "no_directional_superiority": [],
+      "pc_nfpso_superior": [
+        "seasonal_naive",
+        "svr_rbf",
+        "xgboost"
+      ]
+    },
+    "synthetic": {
+      "comparator_superior": [],
+      "no_directional_superiority": [
+        "sarima",
+        "svr_rbf"
+      ],
+      "pc_nfpso_superior": [
+        "naive_1",
+        "seasonal_naive",
+        "drift",
+        "ets",
+        "theta",
+        "ridge_lag",
+        "xgboost"
+      ]
+    },
+    "test": "exact two-sided paired sign test"
+  },
+  "repository_head_before_closure_commit": "ebfbb758a41c0146c9da618c4ce873976e4b5289",
+  "scientific_scope": {
+    "ablation_family": "separate and not yet executed at this closure point",
+    "ablation_outcomes_included": false,
+    "development_selection": "already frozen before Final",
+    "final_external_analysis": "complete",
+    "final_external_execution": "complete"
+  },
+  "secondary_metrics": {
+    "finite_extremes_retained_without_clipping": true,
+    "metrics": [
+      "MAE",
+      "RMSE",
+      "sMAPE",
+      "RMSSE"
+    ],
+    "notable_instability": "M3/Monthly/M90 SARIMA produced catastrophic but finite forecast-error values that strongly distort arithmetic mean summaries; values were retained and not clipped, removed, substituted, or Winsorized.",
+    "raw_mae_rmse_pooled_cross_scale_headline": false
+  },
+  "secondary_sensitivity": {
+    "bootstrap_mean_mase": {
+      "canonical_single_interval_declared": false,
+      "ci_method_frozen": false,
+      "intervals_crossing_zero_across_all_four": [
+        "real/seasonal_naive",
+        "real/sarima"
+      ],
+      "intervals_excluding_zero_across_all_four": 16,
+      "operationalizations_checked": 4,
+      "resamples": 10000,
+      "rng_sequence_frozen": false,
+      "role": "secondary operational-sensitivity characterization only",
+      "same_direction_class_across_all_four": 18,
+      "same_zero_exclusion_across_all_four": 18,
+      "seed": 90210
+    },
+    "wilcoxon": {
+      "holm_family": 18,
+      "holm_significant_comparisons": 18,
+      "role": "sensitivity only"
+    }
+  },
+  "sha256": {
+    "bootstrap_operational_sensitivity_table_sha256": "fcd10d1d255cd14f7ade16a071856211d2e7ae73b93b178247adbe5697b8ce8f",
+    "execution_freeze_sha256": "750554cf28fdccffe8f3b7bae94b4cc6c761afbc4849c689b832f32e3ca768c2",
+    "final_manifest_sha256": "763da2f1e18a1f2572e97f7ece8b17438db0e20c3fe04ac0d05980208f28d5fd",
+    "final_results_aggregate_sha256": "393b7df1fca6d6dc2e57b60b06d6ccca7f15217e3a8c351b9427346829da299b",
+    "incident_manifest_sha256": "62bc0de2de2ee8c56451cf29f0afd87351246d8d5c02fc7f8af18a091c1bf8de",
+    "m4_monthly_results_aggregate_sha256": "59f883415576e75a3c0913d986b7bb405eb41e63ea13d7b3b4a17a85fc9a87bc",
+    "primary_result_table_sha256": "ce650b1c95549ad714e6d09d59e7ecb385a007fb419a923c1fe26f224ad0c814",
+    "primary_support_table_sha256": "47ea6382c39ebc2f50dd89ad6eb957d13ec1e5dbe1f2cb2ac23f15a0609ca245",
+    "raw_scale_direction_counts_sha256": "16d20926ff394f70fb75815961322913a517c895102af47c83a6931bc053a1bc",
+    "raw_scale_stratified_table_sha256": "e138ad1a89d4c70108f8894c9a08adf68230316040dd541797056ef36121b894",
+    "real_analysis_units_sha256": "3b9c67464bdf97e314773f868791a0883a96631e0ef4e808723e5501a3ded14b",
+    "scale_free_secondary_table_sha256": "e797629cf10375a457e4639bdbb4e2c3ba5805b196e932c4af6fc00291f25457",
+    "synthetic_analysis_units_sha256": "9e462d2ffab215617009177082f33e13bc3e29b3b8800cbf40a15d952d3ae00f",
+    "top20_secondary_extremes_sha256": "2a1ff2d44c992ea82ec336ed2cf1e3d43335c4d23631f6959487fde32238c6c5",
+    "wilcoxon_sensitivity_table_sha256": "0b9ceb88bfbeb1fe5410ba7cf4165677560d5e9e88acd643d7f875ac84161660"
+  },
+  "status": "CLOSED"
+}
