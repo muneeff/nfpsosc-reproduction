@@ -1,0 +1,39 @@
+{
+  "code_commit": "c56504bc8d95ebac9aa6e51c165769903077f348",
+  "created_date": "2026-08-14",
+  "design": {
+    "final_dgp_seed_count": 20,
+    "final_optimizer_seed_count": 5,
+    "real_baseline_task_count": 1040,
+    "real_final_series_count": 120,
+    "real_pc_nfpso_task_count": 600,
+    "real_task_count": 1640,
+    "synthetic_baseline_task_count": 4440,
+    "synthetic_pc_nfpso_task_count": 2700,
+    "synthetic_task_count": 7140,
+    "task_count_total": 8780
+  },
+  "final_external_manifest": {
+    "path": "outputs/v2/final_external/final_external_manifest.json",
+    "sha256": "763da2f1e18a1f2572e97f7ece8b17438db0e20c3fe04ac0d05980208f28d5fd",
+    "sidecar_path": "outputs/v2/final_external/final_external_manifest.sha256",
+    "sidecar_value_matches_manifest_sha256": true
+  },
+  "lock_rule": "The frozen Final external manifest is the sole admissible task design for the subsequent Final external benchmark. Task identities, frozen hyperparameters, Final seed sets, real-series identities, method support, and protocol fingerprint must not be changed after Final outcome execution begins.",
+  "outcome_state": {
+    "final_outcome_execution_enabled_at_manifest_creation": false,
+    "final_outcomes_generated_at_manifest_creation": false
+  },
+  "protocol_fingerprint": "545f5be0ec0d14b724ed6dd76189019ab78a72acb39fec0ed53878e2d67700c8",
+  "run_id_bounds": {
+    "first_run_id": "34d165df0541ec1cfadd03c9b123545df778e37371630f500de78876c6937715",
+    "last_run_id": "459621514788e0e8963cbab4022949c01854d2e10872f1e8f91e4ec04f19bd5d"
+  },
+  "schema_version": "v2-final-external-manifest-freeze-1",
+  "selected_hyperparameters": {
+    "radius": 1.0,
+    "ridge_alpha": 0.05
+  },
+  "stage": "3F-2D",
+  "status": "LOCKED_PRE_FINAL_OUTCOME_EXECUTION"
+}
