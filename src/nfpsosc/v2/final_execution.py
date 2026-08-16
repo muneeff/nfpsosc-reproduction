@@ -334,7 +334,50 @@ def _real_manifest_records(project_root_resolved: str) -> dict[tuple[str, str, s
         raise FinalExecutionError("Expected exactly 120 frozen Final real-series records.")
     return records
 
+def _load_m4_single_series(
+    source_root: Path,
+    frequency: str,
+    series_id: str,
+) -> np.ndarray:
+    import pandas as pd
 
+    dataset_dir = source_root / "m4" / "datasets"
+
+    train_path = dataset_dir / f"{frequency}-train.csv"
+    test_path = dataset_dir / f"{frequency}-test.csv"
+
+    if not train_path.is_file() or not test_path.is_file():
+        raise FinalExecutionError(
+            f"Missing M4 files for frequency {frequency!r}."
+        )
+
+    train = pd.read_csv(train_path)
+    test = pd.read_csv(test_path)
+
+    train_row = train[train.iloc[:, 0].astype(str) == series_id]
+    test_row = test[test.iloc[:, 0].astype(str) == series_id]
+
+    if len(train_row) != 1 or len(test_row) != 1:
+        raise FinalExecutionError(
+            f"M4 series {series_id!r} was not found uniquely."
+        )
+
+    train_values = (
+        train_row.iloc[0, 1:]
+        .dropna()
+        .to_numpy(dtype=float)
+    )
+
+    test_values = (
+        test_row.iloc[0, 1:]
+        .dropna()
+        .to_numpy(dtype=float)
+    )
+
+    values = np.concatenate([train_values, test_values])
+
+    return values
+    
 @lru_cache(maxsize=6)
 def _load_real_group(
     project_root_resolved: str,
@@ -374,11 +417,21 @@ def load_frozen_real_task_series(
     record = _real_manifest_records(str(root)).get(key)
     if record is None:
         raise FinalExecutionError("Real task is not one of the 120 frozen Final series.")
-    frame = _load_real_group(str(root), task.source, task.frequency)
-    mask = frame["unique_id"] == task.series_id
-    if int(mask.sum()) < 1:
-        raise FinalExecutionError("Frozen real series is missing from the source snapshot.")
-    y = frame.loc[mask, "y"].to_numpy(dtype=float)
+    if task.source == "M4":
+        y = _load_m4_single_series(
+            root / "data/v2_real_manifest/sources",
+            task.frequency,
+            task.series_id,
+        )
+    else:
+        frame = _load_real_group(str(root), task.source, task.frequency)
+        mask = frame["unique_id"] == task.series_id
+        if int(mask.sum()) < 1:
+            raise FinalExecutionError(
+                "Frozen real series is missing from the source snapshot."
+            )
+        y = frame.loc[mask, "y"].to_numpy(dtype=float)
+
     if not np.all(np.isfinite(y)):
         raise FinalExecutionError("Frozen real series contains non-finite values.")
     if _series_sha256(y) != str(record["series_sha256_float64_le"]):
