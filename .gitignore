@@ -22,3 +22,5 @@ Thumbs.db
 .vscode/
 .idea/
 data/v2_real_manifest/sources/
+# External downloaded M4 dataset
+data/m4/
