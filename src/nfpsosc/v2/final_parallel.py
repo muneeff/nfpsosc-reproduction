@@ -54,8 +54,7 @@ EXECUTION_FREEZE_SCHEMA = "v2-final-execution-workspace-freeze-1"
 EXECUTION_FREEZE_STATUS = "LOCKED_PRE_FINAL_OUTCOMES"
 EXECUTION_FREEZE_FILENAME = "final_execution_workspace_freeze.json"
 EXECUTION_FREEZE_SHA_FILENAME = "final_execution_workspace_freeze.sha256"
-FINAL_EXECUTION_FREEZE_TAG = "v2-final-execution-freeze-2026-08-14"
-
+FINAL_EXECUTION_FREEZE_TAG = "v2-final-memory-safe-execution-freeze-2026-08-16"
 
 class FinalParallelError(RuntimeError):
     """Raised when Final parallel execution violates the frozen contract."""
