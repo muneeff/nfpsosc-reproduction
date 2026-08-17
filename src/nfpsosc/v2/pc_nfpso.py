@@ -149,7 +149,7 @@ def fit_pc_nfpso_v2(
     radius: float,
     alpha: float,
     optimizer_seed: int,
-    dynamics: Literal["standard", "constricted"] = "constricted",
+    dynamics: Literal["nonconstricted", "constricted"] = "constricted",
     boundary: Literal["project", "feasible_rejection"] = "project",
     objective_weights: ObjectiveWeights = ObjectiveWeights(),
 ) -> PCNFPSOFit:
