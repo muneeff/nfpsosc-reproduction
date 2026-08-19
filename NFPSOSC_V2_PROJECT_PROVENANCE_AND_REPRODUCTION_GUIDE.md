@@ -213,3 +213,67 @@ Real tasks:
 Status:
 
 LOCKED_FINAL_PAPER_RELEASE
+
+# Paper Artifacts Index
+
+## Final Manuscript Release
+
+The manuscript artifacts are generated from the frozen experimental state
+associated with:
+
+Tag:
+`v2-final-paper-ready-2026-08-19`
+
+Commit:
+`a7dfdb4a4edcebb9d62a8bea8b0d043179736e5c`
+
+---
+
+## Tables
+
+All manuscript tables are generated from frozen CSV outputs and stored under:
+
+`paper_tables/`
+
+Available tables:
+
+| Artifact | Description |
+|---|---|
+| Table1_performance_ranking.tex | Synthetic benchmark performance ranking |
+| Table2_statistical_significance.csv | Holm-corrected statistical comparisons |
+| Table3_win_loss_PC_vs_NFBASE.tex | Pairwise win/loss analysis |
+| Table4 synthetic summary | Generated from final benchmark outputs |
+| Table5 statistical tests | Generated from Wilcoxon-Holm analysis |
+| Table6 radius sensitivity | Generated from clustering-radius experiments |
+| Table7 real-series summary | Best model per real short-series case |
+| Appendix Table A.8 | Complete real-series forecasting results |
+
+---
+
+## Figures
+
+All figures are generated programmatically from recorded experiment outputs.
+
+Figure sources are maintained under:
+
+`paper_figures/`
+
+The figure-generation scripts include:
+
+- ranking visualization
+- win/loss visualization
+- sensitivity analysis plots
+- statistical diagnostic plots
+
+Figures are not manually modified after generation.
+
+---
+
+## Reproduction Workflow
+
+To regenerate the manuscript artifacts:
+
+1. Checkout the frozen release:
+
+```bash
+git checkout v2-final-paper-ready-2026-08-19
