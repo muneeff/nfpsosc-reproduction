@@ -151,6 +151,19 @@ ABLATION_VARIANTS = {
             low_coverage=0.0,
         ),
     ),
+
+    "PC_NFPSO_NO_PENALTY": AblationVariant(
+        name="PC_NFPSO_NO_PENALTY",
+        uses_pso=True,
+        dynamics="constricted",
+        boundary="project",
+        objective_weights=ObjectiveWeights(
+            fit_rmse=1.0,
+            validation_rmse=1.0,
+            sensitivity=0.0,
+            low_coverage=0.0,
+        ),
+    ),
 }
 
 def fit_ablation_variant(

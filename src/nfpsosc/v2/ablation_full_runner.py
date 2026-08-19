@@ -108,6 +108,7 @@ def run_full_ablation(
                     "variant": item.variant,
                     "status": item.result.status,
                     "metrics": item.result.metrics,
+                                "best_objective": item.result.best_objective,
                     "failure": item.result.failure,
                 },
             )
