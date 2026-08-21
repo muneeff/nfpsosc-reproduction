@@ -1,0 +1,9 @@
+Metadata-Version: 2.4
+Name: nfpsosc-reproduction
+Version: 0.1.0
+Summary: Transparent Python reproduction and research diagnostics for NF-PSO-SC forecasting
+Requires-Python: >=3.10
+Requires-Dist: numpy>=1.24
+Requires-Dist: pandas>=2.0
+Requires-Dist: scipy>=1.10
+Requires-Dist: matplotlib>=3.7

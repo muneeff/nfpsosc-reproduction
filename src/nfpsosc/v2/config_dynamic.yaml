@@ -1,0 +1,24 @@
+# تكوين Dynamic Radius PSO
+dynamic_radius_pso:
+  enabled: true
+  R_max: 15
+  radius_bounds: [0.1, 1.5]
+  recompute_interval: 5
+  penalty_lambda: 0.01
+  swarm_size: 12
+  max_iter: 40
+  alpha: 0.05
+  
+  omega: 0.729
+  c1: 1.494
+  c2: 1.494
+  chi: 0.729
+  
+  clustering:
+    min_density: 0.5
+    max_clusters: 15
+    radius_multiplier: 0.5
+
+methods:
+  pc_nfpso_dynamic: true
+  pc_nfpso: true
