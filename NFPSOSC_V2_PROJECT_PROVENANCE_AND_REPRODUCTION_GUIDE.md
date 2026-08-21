@@ -277,3 +277,15 @@ To regenerate the manuscript artifacts:
 
 ```bash
 git checkout v2-final-paper-ready-2026-08-19
+
+
+---
+
+# Journal Submission Milestone (August 2026)
+
+## Submission Status
+- **Target Journal:** Engineering Applications of Artificial Intelligence (EAAI)[cite: 1]
+- **Manuscript Title:** Dynamic Radius-Adaptive Neuro-Fuzzy Particle Swarm Optimization for Sparse Time-Series Forecasting: A Self-Tuning Explainable Framework
+- **Submission Date:** August 2026
+- **Associated Release Tag:** `v2-final-paper-ready-2026-08-19`[cite: 1]
+- **Repository State:** Locked and fully synchronized with submitted artifacts.
