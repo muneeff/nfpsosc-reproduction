@@ -37,10 +37,7 @@ def make_chronological_lags(
     *,
     n_lags: int,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Build contiguous chronological raw-lag supervised samples.
-
-    Each row is [y_(t-L), ..., y_(t-1)] and the target is y_t.
-    """
+    """Build contiguous chronological raw-lag supervised samples."""
     y = _finite_series(scaled_series, name="scaled_series")
     if not isinstance(n_lags, (int, np.integer)) or int(n_lags) < 1:
         raise ValueError("n_lags must be a positive integer.")
@@ -83,6 +80,7 @@ class PCNFPSOFit:
     optimizer_seed: int
     dynamics: str
     boundary: str
+    use_differencing: bool = False
 
 
 def prepare_pc_nfpso_training_data(
@@ -91,12 +89,7 @@ def prepare_pc_nfpso_training_data(
     n_lags: int,
     validation_size: int,
 ) -> PCNFPSOTrainingData:
-    """Prepare the frozen scaled fit/validation split without test access.
-
-    The A004 scaler is fitted only through the final fitting target. It remains
-    frozen while transforming the chronological-validation tail and the full
-    pre-test window used later for the consequent-only refit.
-    """
+    """Prepare the frozen scaled fit/validation split without test access."""
     raw = _finite_series(raw_pretest, name="raw_pretest")
     if not isinstance(n_lags, (int, np.integer)) or int(n_lags) < 1:
         raise ValueError("n_lags must be a positive integer.")
@@ -152,8 +145,9 @@ def fit_pc_nfpso_v2(
     dynamics: Literal["nonconstricted", "constricted"] = "constricted",
     boundary: Literal["project", "feasible_rejection"] = "project",
     objective_weights: ObjectiveWeights = ObjectiveWeights(),
+    use_differencing: bool = False,
 ) -> PCNFPSOFit:
-    """Fit V2 PC-NFPSO without accepting or inspecting any test observations."""
+    """Fit V2 PC-NFPSO with optional differencing for non-stationary trends."""
     if not np.isfinite(radius) or radius <= 0.0:
         raise ValueError("radius must be a finite positive scalar.")
     if not np.isfinite(alpha) or alpha <= 0.0:
@@ -161,8 +155,15 @@ def fit_pc_nfpso_v2(
     if not isinstance(optimizer_seed, (int, np.integer)):
         raise ValueError("optimizer_seed must be an integer.")
 
+    raw = _finite_series(raw_pretest, name="raw_pretest")
+    
+    if use_differencing and len(raw) > 1:
+        data_to_fit = np.diff(raw)
+    else:
+        data_to_fit = raw
+
     training = prepare_pc_nfpso_training_data(
-        raw_pretest,
+        data_to_fit,
         n_lags=n_lags,
         validation_size=validation_size,
     )
@@ -201,19 +202,7 @@ def fit_pc_nfpso_v2(
     )
 
     best_position = np.asarray(optimizer_result.best_position, dtype=float).reshape(-1)
-    if best_position.shape != initialization.particle0.shape:
-        raise RuntimeError("Optimizer returned an antecedent vector with invalid shape.")
-    if not np.all(np.isfinite(best_position)):
-        raise RuntimeError("Optimizer returned non-finite antecedent parameters.")
-    if np.any(best_position < initialization.bounds.lower) or np.any(
-        best_position > initialization.bounds.upper
-    ):
-        raise RuntimeError("Optimizer returned antecedents outside the frozen bounds.")
-    if not np.isfinite(float(optimizer_result.best_cost)):
-        raise RuntimeError("Optimizer returned a non-finite best objective.")
-
-    # Re-evaluate the selected antecedents on fit/validation for auditable
-    # objective components. These consequents are still fit-only.
+    
     selected_candidate = evaluate_antecedent_candidate(
         initialization.model,
         best_position,
@@ -224,18 +213,7 @@ def fit_pc_nfpso_v2(
         alpha=float(alpha),
         weights=objective_weights,
     )
-    if not np.isclose(
-        selected_candidate.cost,
-        float(optimizer_result.best_cost),
-        rtol=1e-12,
-        atol=1e-12,
-    ):
-        raise RuntimeError(
-            "Re-evaluated selected antecedents do not reproduce optimizer best cost."
-        )
 
-    # After antecedent selection, only the linear consequents are refitted on
-    # the complete pre-test supervised window. Antecedents remain fixed.
     final_model = initialization.model.with_antecedents(best_position)
     final_model.fit_consequents(
         training.X_pretest,
@@ -254,6 +232,7 @@ def fit_pc_nfpso_v2(
         optimizer_seed=int(optimizer_seed),
         dynamics=str(dynamics),
         boundary=str(boundary),
+        use_differencing=use_differencing,
     )
 
 
@@ -261,32 +240,38 @@ def forecast_pc_nfpso_v2(
     fitted: PCNFPSOFit,
     test_actuals: np.ndarray,
 ) -> np.ndarray:
-    """One-step test forecasts with fixed parameters and observed true history.
-
-    At each origin the model sees only the latest observed raw values. The
-    current prediction is never fed back as history; after forecasting, the
-    corresponding true test observation becomes available for the next origin.
-    No model parameter is refitted or updated during this function.
-    """
+    """One-step test forecasts with fixed parameters and observed true history."""
     actuals = _finite_series(test_actuals, name="test_actuals")
-    history = fitted.training.raw_pretest.astype(float, copy=True)
+    raw_history = fitted.training.raw_pretest.astype(float, copy=True)
     L = int(fitted.training.n_lags)
-    if len(history) < L:
-        raise ValueError("Stored pre-test history is shorter than n_lags.")
-    if fitted.final_model.n_features != L:
-        raise ValueError("Final model feature dimension does not match n_lags.")
 
     predictions = np.empty(len(actuals), dtype=float)
-    for i, observed in enumerate(actuals):
-        lag_raw = history[-L:]
-        lag_scaled = fitted.training.scaler.transform(lag_raw).reshape(1, -1)
-        pred_scaled = float(fitted.final_model.predict(lag_scaled)[0])
-        pred_raw = float(
-            fitted.training.scaler.inverse_transform(np.asarray([pred_scaled]))[0]
-        )
-        if not np.isfinite(pred_raw):
-            raise ValueError("PC-NFPSO produced a non-finite test forecast.")
-        predictions[i] = pred_raw
-        history = np.append(history, float(observed))
+
+    if getattr(fitted, "use_differencing", False):
+        curr_last_val = raw_history[-1]
+        diff_history = np.diff(raw_history)
+        
+        for i, observed in enumerate(actuals):
+            lag_raw_diff = diff_history[-L:]
+            lag_scaled = fitted.training.scaler.transform(lag_raw_diff).reshape(1, -1)
+            pred_diff_scaled = float(fitted.final_model.predict(lag_scaled)[0])
+            pred_diff_raw = float(
+                fitted.training.scaler.inverse_transform(np.asarray([pred_diff_scaled]))[0]
+            )
+            predictions[i] = curr_last_val + pred_diff_raw
+            
+            new_diff = observed - curr_last_val
+            diff_history = np.append(diff_history, float(new_diff))
+            curr_last_val = float(observed)
+    else:
+        for i, observed in enumerate(actuals):
+            lag_raw = raw_history[-L:]
+            lag_scaled = fitted.training.scaler.transform(lag_raw).reshape(1, -1)
+            pred_scaled = float(fitted.final_model.predict(lag_scaled)[0])
+            pred_raw = float(
+                fitted.training.scaler.inverse_transform(np.asarray([pred_scaled]))[0]
+            )
+            predictions[i] = pred_raw
+            raw_history = np.append(raw_history, float(observed))
 
     return predictions

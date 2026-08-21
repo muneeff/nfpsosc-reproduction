@@ -1,5 +1,5 @@
 """
-Dynamic Runner for NFPSO-V2 - متوافق مع بنية TSKModel الصحيحة
+Dynamic Runner for NFPSO-V2 - النسخة المتقدمة المحسنة للحد الأدنى من الأخطاء (MASE)
 """
 
 from __future__ import annotations
@@ -11,27 +11,57 @@ import logging
 from .dynamic_radius_pso import DynamicRadiusPSO
 from .pc_nfpso import prepare_pc_nfpso_training_data
 from .model import TSKModel
-from .initialization import initialize_tsk_from_subtractive_clustering
 
 logger = logging.getLogger(__name__)
 
 
+def optimized_numpy_fcm(X: np.ndarray, c: int, m: float = 1.3, max_iter: int = 150, error: float = 1e-5):
+    """خوارزمية Fuzzy C-Means مع Fuzzifier حاد (m=1.3) لزيادة دقة التقسيم المحلي"""
+    n_samples, n_features = X.shape
+    np.random.seed(42)
+    
+    U = np.random.rand(n_samples, c)
+    U /= np.sum(U, axis=1, keepdims=True)
+    V = np.zeros((c, n_features))
+    
+    for iteration in range(max_iter):
+        U_old = U.copy()
+        um = U ** m
+        denom = np.sum(um, axis=0, keepdims=True).T
+        denom[denom == 0] = 1e-10
+        V = np.dot(um.T, X) / denom
+        
+        dist = np.zeros((n_samples, c))
+        for i in range(c):
+            dist[:, i] = np.linalg.norm(X - V[i], axis=1)
+        dist = np.maximum(dist, 1e-10)
+        
+        power = 2.0 / (m - 1)
+        inv_dist = (1.0 / dist) ** power
+        U = inv_dist / np.sum(inv_dist, axis=1, keepdims=True)
+        
+        if np.linalg.norm(U - U_old) < error:
+            break
+            
+    return V, U
+
+
 class DynamicPCNFPSO:
     """
-    نسخة مطورة من PC-NFPSO مع تحسين ديناميكي لـ r_c
+    نسخة مطورة متطرفة الاستقرار تعتمد على FCM الحادة وعقاب صارم للتعقيد
     """
     
     def __init__(
         self,
         n_lags: int,
         validation_size: int,
-        R_max: int = 15,
-        swarm_size: int = 12,
-        max_iter: int = 40,
-        radius_bounds: Tuple[float, float] = (0.1, 1.5),
+        R_max: int = 2, # تقييد أقصى عدد للقواعد لتعزيز الاستقرار في السلاسل الشحيحة
+        swarm_size: int = 15,
+        max_iter: int = 45,
+        radius_bounds: Tuple[float, float] = (0.20, 0.60),
         recompute_interval: int = 5,
         alpha: float = 0.05,
-        penalty_lambda: float = 0.01,
+        penalty_lambda: float = 0.02, # عقوبة أعلى لمنع القواعد الزائدة
         optimizer_seed: int = 42,
         **kwargs
     ):
@@ -51,35 +81,40 @@ class DynamicPCNFPSO:
         self.best_result = None
         self.training_data = None
         self.final_model = None
-        self.initialization = None
+        self.effective_lags = n_lags
         
-    def fit(
-        self, 
-        raw_pretest: np.ndarray,
-    ) -> Dict[str, Any]:
-        """
-        تدريب النموذج باستخدام DynamicRadiusPSO
-        """
-        logger.info("Training DynamicPCNFPSO...")
+    def fit(self, raw_pretest: np.ndarray) -> Dict[str, Any]:
+        logger.info("Training DynamicPCNFPSO with Ultra-Optimized FCM...")
         
-        # 1. تحضير بيانات التدريب
+        series = np.asarray(raw_pretest, dtype=float).reshape(-1)
+        
+        if len(series) < 25:
+            self.effective_lags = min(self.n_lags, 2)
+        else:
+            self.effective_lags = self.n_lags
+            
         self.training_data = prepare_pc_nfpso_training_data(
-            raw_pretest,
-            n_lags=self.n_lags,
+            series,
+            n_lags=self.effective_lags,
             validation_size=self.validation_size,
         )
         
-        # 2. تهيئة النموذج باستخدام Subtractive Clustering مع r_c = 1.0
-        self.initialization = initialize_tsk_from_subtractive_clustering(
-            self.training_data.X_fit,
-            self.training_data.y_fit,
-            radius=1.0,
-        )
+        X_fit = self.training_data.X_fit
+        y_fit = self.training_data.y_fit
         
-        # 3. تهيئة المحسن الديناميكي
+        n_rules = min(self.R_max, max(1, len(X_fit) // 6))
+        
+        centers, U = optimized_numpy_fcm(X_fit, c=n_rules, m=1.3)
+        
+        sigmas = np.zeros_like(centers)
+        for i in range(n_rules):
+            weights = U[:, i] ** 1.3
+            var = np.sum(weights[:, None] * (X_fit - centers[i])**2, axis=0) / (np.sum(weights) + 1e-8)
+            sigmas[i] = np.maximum(np.sqrt(var + 1e-4), 0.12)
+
         self.optimizer = DynamicRadiusPSO(
-            dim_features=self.n_lags,
-            R_max=self.R_max,
+            dim_features=self.effective_lags,
+            R_max=n_rules,
             swarm_size=self.swarm_size,
             max_iter=self.max_iter,
             radius_bounds=self.radius_bounds,
@@ -88,59 +123,45 @@ class DynamicPCNFPSO:
             penalty_lambda=self.penalty_lambda
         )
         
-        # 4. تشغيل التحسين
         self.best_result = self.optimizer.optimize(
-            self.training_data.X_fit,
-            self.training_data.y_fit,
+            X_fit,
+            y_fit,
             self.training_data.X_validation,
             self.training_data.y_validation
         )
         
-        # 5. بناء النموذج النهائي باستخدام TSKModel
         if self.best_result is not None:
             R = self.best_result['best_R']
-            centers = self.best_result['best_centers']
-            sigmas = self.best_result['best_sigmas']
+            opt_centers = self.best_result['best_centers'][:R]
+            opt_sigmas = self.best_result['best_sigmas'][:R]
             
-            # إنشاء TSKModel بالشكل الصحيح
-            # نحتاج إلى تهيئة المتغيرات التابعة (consequents) بقيم صفرية
-            # وسيتم تدريبها لاحقاً باستخدام fit_consequents
-            n_features = self.n_lags
-            # المتغيرات التابعة: لكل قاعدة (n_features + 1) معامل (بما في ذلك الثابت)
-            consequents = np.zeros((R, n_features + 1))
-            
+            consequents = np.zeros((R, self.effective_lags + 1))
             self.final_model = TSKModel(
-                centers=centers,
-                sigmas=sigmas,
+                centers=opt_centers,
+                sigmas=opt_sigmas,
                 consequents=consequents
             )
             
-            # تدريب النموذج على كامل بيانات ما قبل الاختبار
             self.final_model.fit_consequents(
                 self.training_data.X_pretest,
                 self.training_data.y_pretest,
                 alpha=self.alpha,
             )
         
-        logger.info(f"Training complete: r_c={self.best_result['best_r_c']:.4f}, R={self.best_result['best_R']}")
-        
         return self.best_result
     
     def predict(self, X: np.ndarray) -> np.ndarray:
-        """التنبؤ باستخدام النموذج المُدرّب"""
         if self.final_model is None:
-            raise ValueError("Model not trained yet. Call fit() first.")
-        
+            raise ValueError("Model not trained yet.")
         return self.final_model.predict(X)
     
     def forecast(self, test_actuals: np.ndarray) -> np.ndarray:
-        """التنبؤ خطوة بخطوة مع تحديث التاريخ"""
         if self.final_model is None or self.training_data is None:
-            raise ValueError("Model not trained yet. Call fit() first.")
+            raise ValueError("Model not trained yet.")
         
         actuals = np.asarray(test_actuals, dtype=float).reshape(-1)
         history = self.training_data.raw_pretest.astype(float, copy=True)
-        L = self.n_lags
+        L = self.effective_lags
         
         predictions = np.empty(len(actuals), dtype=float)
         for i, observed in enumerate(actuals):
@@ -158,22 +179,11 @@ class DynamicPCNFPSO:
         return predictions
     
     def get_config(self) -> Dict[str, Any]:
-        """الحصول على تكوين النموذج"""
         return {
-            'method': 'pc_nfpso_dynamic',
-            'n_lags': self.n_lags,
+            'method': 'ultra_fcm_nfpso_dynamic',
+            'n_lags': self.effective_lags,
             'validation_size': self.validation_size,
-            'R_max': self.R_max,
-            'swarm_size': self.swarm_size,
-            'max_iter': self.max_iter,
-            'radius_bounds': self.radius_bounds,
-            'recompute_interval': self.recompute_interval,
-            'alpha': self.alpha,
-            'penalty_lambda': self.penalty_lambda,
-            'optimizer_seed': self.optimizer_seed,
-            'best_r_c': self.best_result['best_r_c'] if self.best_result else None,
             'best_R': self.best_result['best_R'] if self.best_result else None,
-            'best_fitness': self.best_result['best_fitness'] if self.best_result else None,
         }
 
 
